@@ -5,6 +5,9 @@
 
 body{
   font-family: "Ubuntu", sans-serif;
+  background-color: #2F3642; 
+  margin: 0; 
+  padding-top: 64px;
 }
 
 
@@ -28,4 +31,8 @@ p:active {
   
   
   text-decoration: none !important;
+}
+
+html {
+  scroll-behavior: smooth;
 }

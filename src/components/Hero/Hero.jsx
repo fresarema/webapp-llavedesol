@@ -7,7 +7,7 @@ import { slideUp,slideFromSide } from '../../utility/animation'
 
 const Hero = () => {
   return (
-    <section className='mt-36'>
+    <section id="hero" className='mt-36'>
         <div className='grid grid-cols-1 md:grid-cols-2'>
           
           {/*Textos y descripcion*/}

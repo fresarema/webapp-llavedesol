@@ -5,7 +5,7 @@ const navbarlinks = [
     {
         id: 1,
         title:"Inicio",
-        link: " / "
+        link: "#hero"
     },
     {
         id: 2,
