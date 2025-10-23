@@ -1,4 +1,5 @@
 import React,{useState} from 'react'
+import { Link } from 'react-router-dom';
 import Logo from '../../assets/Logo.png'
 
 const navbarlinks = [
@@ -40,7 +41,9 @@ const Navbar = () => {
     <nav className="fixed top-0 left-0 bg-gray-800 w-full bg-opacity-30 backdrop-blur-md z-50">
       <div className='flex justify-between items-center sm:px-12 sm:py-6 px-4 py-3'>
         <div>
-            <img src={Logo} alt="Logo" className='w-[100px]'/>
+          <Link to="/">
+            <img src={Logo} alt="Logo" className='w-[100px]' />
+          </Link>
         </div>
 
         <button onClick={toggleMenu} className='md:hidden text-orange-500'>
@@ -81,7 +84,7 @@ const Navbar = () => {
                 ))}
             </ul>
         </div>
-        <div className='hidden md:block'>
+        <div className='hidden md:flex items-center space-x-6'>
             <ul className='flex space-x-4'>
                 {navbarRedes.map((link)=>(
                   <li key={link.id}>
@@ -100,6 +103,12 @@ const Navbar = () => {
                   </li>
                 ))}
             </ul>
+            <Link
+              to="/login"
+              className='!text-white bg-orange-500 sm:text-lg text-sm px-4 py-2 rounded-md hover:bg-orange-600 transition-colors duration-300'
+            >
+              Login
+            </Link>
         </div>
       </div>
       <div className={`md:hidden absolute w-full bg-gray-800 transition-all duration-300 ${isOpen ? "opacity-100 visible" : "opacity-0 invisible"}`}>
@@ -113,6 +122,17 @@ const Navbar = () => {
                   </li>
                 ))}
             </ul>
+
+            <div className='px-4 py-2 text-center'>
+              <Link
+                to="/login"
+                className='!text-white bg-orange-500 px-4 py-2 rounded-md hover:bg-orange-600 transition-colors duration-300 w-full block'
+                onClick={() => setIsOpen(false)} // Cierra el menú al hacer clic
+              >
+                Login
+              </Link>
+            </div>
+
             <ul className='flex space-x-4 px-4 py-2 border-t border-gray-600 justify-center'>
                 {navbarRedes.map((link)=>(
                   <li key={link.id}>

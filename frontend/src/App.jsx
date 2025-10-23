@@ -1,29 +1,44 @@
-import Hero from "./components/Hero/Hero"
-import Navbar from "./components/Navbar/Navbar"
-import Fondo from "./assets/fondo.png"
-import TrabajoLocal from "./components/TrabajoLocal/TrabajoLocal";
-import Contacto from "./components/Contacto/Contacto";
+import React from 'react';
+import { Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+
+// Importamos todas nuestras páginas
+import LandingPage from './pages/LandingPage';
+import Login from './pages/Login';
+import AdminView from './pages/AdminView';
+import TesoreroView from './pages/TesoreroView';
+import ProtectedRoute from './utils/ProtectedRoute';
 
 function App() {
-
-  const bgImagen ={
-    backgroundAttachment: 'fixed',
-    backgroundImage: `url(${Fondo})`,
-    backgoundRepeat: 'no-repeat',
-    backgroundSize: 'cover',
-    backgroundPosition: 'bottom',
-    width: '100%',
-  }
-
   return (
-    <div style={bgImagen} className="relative">
-      <Navbar />
-      <Hero />
-      <TrabajoLocal />
-      <Contacto />
+    // 1. Envolvemos todo en AuthProvider
+    <AuthProvider>
+      {/* 2. Definimos las rutas */}
+      <Routes>
+        {/* Rutas Públicas */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<Login />} />
 
-    </div>
-  )
+        {/* Rutas Protegidas */}
+        <Route 
+          path="/admin" 
+          element={
+            <ProtectedRoute role="admin">
+              <AdminView />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/tesorero" 
+          element={
+            <ProtectedRoute role="tesorero">
+              <TesoreroView />
+            </ProtectedRoute>
+          } 
+        />
+      </Routes>
+    </AuthProvider>
+  );
 }
 
-export default App
+export default App;
