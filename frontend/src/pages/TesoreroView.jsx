@@ -8,10 +8,20 @@ import Logo from "../assets/Logo.png";
 function TesoreroView() {
     const { user, logoutUser } = useAuth();
     const [libros, setLibros] = useState([]);
+    const [librosFiltrados, setLibrosFiltrados] = useState([]);
     const [loading, setLoading] = useState(true);
     const [mostrarForm, setMostrarForm] = useState(false);
     const [editandoId, setEditandoId] = useState(null);
     
+    // Estado para filtros
+    const [filtros, setFiltros] = useState({
+        busqueda: '',
+        tipo: '',
+        año: '',
+        mes: '',
+        orden: '-fecha_periodo'
+    });
+
     const [form, setForm] = useState({
         titulo: '',
         descripcion: '',
@@ -24,6 +34,11 @@ function TesoreroView() {
         cargarLibros();
     }, []);
 
+    // Aplicar filtros cuando cambien los filtros o los libros
+    useEffect(() => {
+        aplicarFiltros();
+    }, [filtros, libros]);
+
     const cargarLibros = async () => {
         try {
             const data = await getLibrosCuentas();
@@ -33,6 +48,81 @@ function TesoreroView() {
         } finally {
             setLoading(false);
         }
+    };
+
+    // Función para aplicar filtros
+    const aplicarFiltros = () => {
+        let resultados = [...libros];
+
+        // Filtro por búsqueda de texto
+        if (filtros.busqueda) {
+            const busquedaLower = filtros.busqueda.toLowerCase();
+            resultados = resultados.filter(libro => 
+                libro.titulo.toLowerCase().includes(busquedaLower) ||
+                libro.descripcion.toLowerCase().includes(busquedaLower)
+            );
+        }
+
+        // Filtro por tipo
+        if (filtros.tipo) {
+            resultados = resultados.filter(libro => libro.tipo === filtros.tipo);
+        }
+
+        // Filtro por año
+        if (filtros.año) {
+            resultados = resultados.filter(libro => {
+                const añoLibro = new Date(libro.fecha_periodo).getFullYear().toString();
+                return añoLibro === filtros.año;
+            });
+        }
+
+        // Filtro por mes
+        if (filtros.mes) {
+            resultados = resultados.filter(libro => {
+                const mesLibro = (new Date(libro.fecha_periodo).getMonth() + 1).toString().padStart(2, '0');
+                return mesLibro === filtros.mes;
+            });
+        }
+
+        // Ordenamiento
+        resultados.sort((a, b) => {
+            const fechaA = new Date(a.fecha_periodo);
+            const fechaB = new Date(b.fecha_periodo);
+            
+            if (filtros.orden === '-fecha_periodo') {
+                return fechaB - fechaA;
+            } else {
+                return fechaA - fechaB;
+            }
+        });
+
+        setLibrosFiltrados(resultados);
+    };
+
+    // Manejar cambios en los filtros
+    const handleFiltroChange = (e) => {
+        const { name, value } = e.target;
+        setFiltros(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    // Limpiar todos los filtros
+    const limpiarFiltros = () => {
+        setFiltros({
+            busqueda: '',
+            tipo: '',
+            año: '',
+            mes: '',
+            orden: '-fecha_periodo'
+        });
+    };
+
+    // Obtener años únicos para el dropdown
+    const obtenerAñosUnicos = () => {
+        const años = libros.map(libro => new Date(libro.fecha_periodo).getFullYear());
+        return [...new Set(años)].sort((a, b) => b - a);
     };
 
     const handleInputChange = (e) => {
@@ -172,15 +262,123 @@ function TesoreroView() {
                             </button>
                         </div>
 
+                        {/* SECCIÓN DE FILTROS - COMPACTA */}
+                        <div className="bg-gray-50 p-3 rounded-lg mb-4 border">
+                            <div className="flex justify-between items-center mb-3">
+                                <h3 className="text-md font-semibold text-gray-700">Filtros</h3>
+                                <button
+                                    onClick={limpiarFiltros}
+                                    className="text-xs text-gray-500 hover:text-gray-700 underline"
+                                >
+                                    Limpiar filtros
+                                </button>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+                                {/* Búsqueda por texto */}
+                                <div>
+                                    <label className="block text-xs font-medium mb-1 text-gray-600">Buscar</label>
+                                    <input
+                                        type="text"
+                                        name="busqueda"
+                                        value={filtros.busqueda}
+                                        onChange={handleFiltroChange}
+                                        placeholder="Título o descripción..."
+                                        className="border w-full p-1 rounded text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                    />
+                                </div>
+
+                                {/* Filtro por tipo */}
+                                <div>
+                                    <label className="block text-xs font-medium mb-1 text-gray-600">Tipo</label>
+                                    <select
+                                        name="tipo"
+                                        value={filtros.tipo}
+                                        onChange={handleFiltroChange}
+                                        className="border w-full p-1 rounded text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                    >
+                                        <option value="">Todos los tipos</option>
+                                        <option value="MENSUAL">Mensual</option>
+                                        <option value="TRIMESTRAL">Trimestral</option>
+                                        <option value="ANUAL">Anual</option>
+                                        <option value="EVENTO">Evento</option>
+                                    </select>
+                                </div>
+
+                                {/* Filtro por año */}
+                                <div>
+                                    <label className="block text-xs font-medium mb-1 text-gray-600">Año</label>
+                                    <select
+                                        name="año"
+                                        value={filtros.año}
+                                        onChange={handleFiltroChange}
+                                        className="border w-full p-1 rounded text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                    >
+                                        <option value="">Todos los años</option>
+                                        {obtenerAñosUnicos().map(año => (
+                                            <option key={año} value={año}>{año}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Filtro por mes */}
+                                <div>
+                                    <label className="block text-xs font-medium mb-1 text-gray-600">Mes</label>
+                                    <select
+                                        name="mes"
+                                        value={filtros.mes}
+                                        onChange={handleFiltroChange}
+                                        className="border w-full p-1 rounded text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                    >
+                                        <option value="">Todos los meses</option>
+                                        <option value="01">Enero</option>
+                                        <option value="02">Febrero</option>
+                                        <option value="03">Marzo</option>
+                                        <option value="04">Abril</option>
+                                        <option value="05">Mayo</option>
+                                        <option value="06">Junio</option>
+                                        <option value="07">Julio</option>
+                                        <option value="08">Agosto</option>
+                                        <option value="09">Septiembre</option>
+                                        <option value="10">Octubre</option>
+                                        <option value="11">Noviembre</option>
+                                        <option value="12">Diciembre</option>
+                                    </select>
+                                </div>
+
+                                {/* Ordenamiento */}
+                                <div>
+                                    <label className="block text-xs font-medium mb-1 text-gray-600">Ordenar</label>
+                                    <select
+                                        name="orden"
+                                        value={filtros.orden}
+                                        onChange={handleFiltroChange}
+                                        className="border w-full p-1 rounded text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                    >
+                                        <option value="-fecha_periodo">Más reciente</option>
+                                        <option value="fecha_periodo">Más antiguo</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Contador de resultados */}
+                            <div className="mt-2 text-xs text-gray-500">
+                                Mostrando {librosFiltrados.length} de {libros.length} libros
+                            </div>
+                        </div>
+
                         {loading ? (
                             <div className="text-center py-8">Cargando libros...</div>
-                        ) : libros.length === 0 ? (
+                        ) : librosFiltrados.length === 0 ? (
                             <div className="text-center py-8 text-gray-500">
-                                No hay libros de cuentas subidos aún.
+                                {libros.length === 0 
+                                    ? "No hay libros de cuentas subidos aún."
+                                    : "No se encontraron libros con los filtros aplicados."
+                                }
                             </div>
                         ) : (
                             <div className="space-y-4">
-                                {libros.map((libro) => (
+                                {librosFiltrados.map((libro) => (
                                     <div key={libro.id} className="border border-gray-200 p-4 rounded-lg bg-gray-50">
                                         <div className="flex justify-between items-start">
                                             <div className="flex-1">
