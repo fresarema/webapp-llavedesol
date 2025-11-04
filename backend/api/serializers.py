@@ -1,4 +1,6 @@
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from .models import Anuncio
+from rest_framework import serializers
 
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
@@ -9,3 +11,7 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['is_tesorero'] = user.groups.filter(name='Tesorero').exists()
 
         return token
+class AnuncioSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Anuncio
+        fields = '__all__'

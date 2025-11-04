@@ -3,6 +3,7 @@ import Navbar from "../components/Navbar/Navbar"
 import Fondo from "../assets/fondo.png"
 import TrabajoLocal from "../components/TrabajoLocal/TrabajoLocal";
 import Contacto from "../components/Contacto/Contacto";
+import LandingAnuncios from "../components/LandingAnuncios/LandingAnuncios";
 
 function App() {
 
@@ -20,6 +21,7 @@ function App() {
       <Navbar />
       <Hero />
       <TrabajoLocal />
+      <LandingAnuncios />
       <Contacto />
 
     </div>
