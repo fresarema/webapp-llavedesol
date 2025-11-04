@@ -36,3 +36,24 @@ class LibroCuenta(models.Model):
 
     def __str__(self):
         return f"{self.titulo} - {self.fecha_periodo}"
+    
+ # modelo para mensjaes Internos
+class Mensaje(models.Model):
+    TIPO_USUARIO = [
+        ('ADMIN', 'Administrador'),
+        ('TESORERO', 'Tesorero'),
+    ]
+    
+    emisor_tipo = models.CharField(max_length=10, choices=TIPO_USUARIO)
+    destinatario_tipo = models.CharField(max_length=10, choices=TIPO_USUARIO)
+    asunto = models.CharField(max_length=200)
+    mensaje = models.TextField()
+    leido = models.BooleanField(default=False)
+    creado_en = models.DateTimeField(auto_now_add=True)
+    archivo_adjunto = models.FileField(upload_to='mensajes_adjuntos/', blank=True, null=True)
+
+    class Meta:
+        ordering = ['-creado_en']
+
+    def __str__(self):
+        return f"{self.asunto} - {self.emisor_tipo}"
