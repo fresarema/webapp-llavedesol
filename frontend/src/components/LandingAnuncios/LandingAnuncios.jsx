@@ -8,9 +8,11 @@ function LandingAnuncios() {
     useEffect(() => {
         async function cargarAnuncios() {
             try {
-                console.log("🔍 Cargando anuncios..."); // Para debug
                 const data = await getAnuncios();
-                console.log("📦 Datos recibidos:", data); // Para debug
+                console.log("📦 Datos recibidos:", data);
+                if (data.length > 0) {
+                    console.log("📝 Campos disponibles:", Object.keys(data[0]));
+                }
                 const anunciosActivos = data.filter(anuncio => anuncio.is_active !== false);
                 setAnuncios(anunciosActivos);
             } catch (error) {
@@ -22,6 +24,24 @@ function LandingAnuncios() {
         cargarAnuncios();
     }, []);
 
+    // Función para encontrar y formatear la fecha
+    const obtenerFecha = (anuncio) => {
+        // Busca campos comunes de fecha
+        const camposFecha = ['creado_en', 'created_at', 'fecha_creacion', 'fecha', 'date_created'];
+        
+        for (let campo of camposFecha) {
+            if (anuncio[campo]) {
+                return new Date(anuncio[campo]).toLocaleDateString('es-ES', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            }
+        }
+        
+        return 'Fecha no disponible';
+    };
+
     if (loading) {
         return (
             <div className="py-16 bg-white">
@@ -32,7 +52,6 @@ function LandingAnuncios() {
         );
     }
 
-    // CAMBIA ESTA PARTE - mostrar sección incluso si no hay anuncios
     return (
         <section className="py-16 bg-white">
             <div className="container mx-auto px-4">
@@ -59,12 +78,23 @@ function LandingAnuncios() {
                                     {anuncio.descripcion}
                                 </p>
                                 {anuncio.imagen && (
-                                    <img 
-                                        src={anuncio.imagen} 
-                                        alt={anuncio.titulo}
-                                        className="mt-4 rounded-lg w-full h-48 object-cover"
-                                    />
+                                    <div className="mt-4 rounded-lg overflow-hidden">
+                                        <img 
+                                            src={anuncio.imagen} 
+                                            alt={anuncio.titulo}
+                                            className="w-full h-48 object-cover hover:scale-105 transition duration-300"
+                                        />
+                                    </div>
                                 )}
+                                
+                                {/* FECHA DE CREACIÓN - VERSIÓN INTELIGENTE */}
+                                <div className="mt-4 pt-4 border-t border-gray-200">
+                                    <p className="text-sm text-gray-500">
+                                        Publicado: {obtenerFecha(anuncio)}
+                                    </p>
+                                   
+                                    
+                                </div>
                             </div>
                         ))}
                     </div>
