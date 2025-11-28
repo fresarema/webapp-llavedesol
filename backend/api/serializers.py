@@ -1,5 +1,5 @@
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from .models import Anuncio, LibroCuenta, Mensaje
+from .models import Anuncio, LibroCuenta, Mensaje, Contacto
 from rest_framework import serializers
 
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -35,3 +35,11 @@ class MensajeSerializer(serializers.ModelSerializer):
     
     def get_destinatario_display(self, obj):
         return obj.get_destinatario_tipo_display()
+    
+
+# SERIALIZER PAL FORMULARIO
+
+class ContactoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Contacto
+        fields = '__all__'

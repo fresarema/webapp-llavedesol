@@ -1,12 +1,13 @@
 from django.urls import path, include
 from .views import MyTokenObtainPairView
 from rest_framework.routers import DefaultRouter
-from .views import AnuncioViewSet, LibroCuentaViewSet, MensajeViewSet
+from .views import AnuncioViewSet, LibroCuentaViewSet, MensajeViewSet , ContactoViewSet
 
 router = DefaultRouter()
 router.register(r'anuncios', AnuncioViewSet, basename='anuncios')
 router.register(r'libros-cuentas', LibroCuentaViewSet, basename='librocuenta')
-router.register(r'mensajes', MensajeViewSet, basename='mensajes')  # ✅ Correcto
+router.register(r'mensajes', MensajeViewSet, basename='mensajes')
+router.register(r'contacto', ContactoViewSet)
 
 urlpatterns = [
     path('token/', MyTokenObtainPairView.as_view(), name='token_obtain_pair'),

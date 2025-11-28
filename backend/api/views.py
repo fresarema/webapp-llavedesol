@@ -5,8 +5,8 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q
-from .models import Anuncio, LibroCuenta, Mensaje  
-from .serializers import AnuncioSerializer, LibroCuentaSerializer, MensajeSerializer 
+from .models import Anuncio, LibroCuenta, Mensaje  , Contacto
+from .serializers import AnuncioSerializer, LibroCuentaSerializer, MensajeSerializer , ContactoSerializer
 
 class MyTokenObtainPairView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer
@@ -31,7 +31,7 @@ class LibroCuentaViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return super().get_queryset()
 
-# ✅ VIEWSET CORREGIDO PARA MENSAJES
+# VIEWSET CORREGIDO PARA MENSAJES
 class MensajeViewSet(viewsets.ModelViewSet):
     serializer_class = MensajeSerializer
     permission_classes = [permissions.AllowAny]
@@ -47,3 +47,9 @@ class MensajeViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(emisor_tipo=emisor_tipo)
             
         return queryset
+    
+
+# VISTA DEL FORMULARIO
+class ContactoViewSet(viewsets.ModelViewSet):
+    queryset = Contacto.objects.all().order_by('-fecha')
+    serializer_class = ContactoSerializer

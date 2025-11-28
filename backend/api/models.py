@@ -57,3 +57,16 @@ class Mensaje(models.Model):
 
     def __str__(self):
         return f"{self.asunto} - {self.emisor_tipo}"
+    
+
+# MODELO PARA LOS DATOS DEL FORMULARIO DE CONTACTO
+
+class Contacto(models.Model):
+    nombre = models.CharField(max_length=100)
+    correo = models.EmailField()
+    mensaje = models.TextField()
+    fecha = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Mensaje de {self.nombre}"
+    
