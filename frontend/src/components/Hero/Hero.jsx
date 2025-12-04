@@ -1,8 +1,8 @@
 import React from 'react'
-import Portada from '../../assets/Portada.webp'
-import {motion} from 'framer-motion'
-import { slideUp,slideFromSide } from '../../utility/animation'
-
+import Portada from '../../assets/Portada.webp';
+import {motion} from 'framer-motion';
+import { slideUp,slideFromSide } from '../../utility/animation';
+import { Link } from 'react-router-dom';
 
 
 const Hero = () => {
@@ -30,18 +30,16 @@ const Hero = () => {
             initial="initial"
             animate="animate"
             >
-              <a className='bg-orange-600 py-2 px-12 
-              rounded-3xl text-white hover:bg-orange-700 hover:!text-yellow-200
-              transition-all duration-300 item-center 
-              cursor-pointer !no-underline'>
-                Dona ahora
-                </a>
-              <a className='bg-orange-600 py-2 px-12 
-              rounded-3xl text-white hover:bg-orange-700 hover:!text-yellow-200
-              transition-all duration-300 item-center 
-              cursor-pointer !no-underline'>
-                Hazte socio
-                </a>
+              {             }
+                <Link 
+                  to= "/donaciones" 
+                  className='bg-orange-600 py-2 px-12 
+                  rounded-3xl text-white hover:bg-orange-700 hover:!text-yellow-200
+                  transition-all duration-300 item-center 
+                  cursor-pointer !no-underline'>
+                  Dona ahora
+                  </Link>
+
             </motion.div>
           </div>
 

@@ -1,5 +1,5 @@
 
-
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -15,7 +15,12 @@ SECRET_KEY = 'django-insecure-x1_*u4$2)im=wfc9w+b#^k)qp3v4dq%rs2e%92h&((r&n_oc#w
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    '127.0.0.1', 
+    'localhost',
+    '.ngrok-free.dev',
+    'perceivable-exemptive-kasha.ngrok-free.dev' 
+]
 
 
 # Application definition

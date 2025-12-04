@@ -5,6 +5,7 @@ import TrabajoLocal from "../components/TrabajoLocal/TrabajoLocal";
 import Contacto from "../components/Contacto/Contacto";
 import LandingAnuncios from "../components/LandingAnuncios/LandingAnuncios";
 
+
 function App() {
 
   const bgImagen ={
@@ -23,7 +24,6 @@ function App() {
       <TrabajoLocal />
       <LandingAnuncios />
       <Contacto />
-
     </div>
   )
 }
