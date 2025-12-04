@@ -11,6 +11,7 @@ from django.utils import timezone
 import json
 import decimal
 import traceback
+import django.db.utils
 from django.db import transaction
 
 # --- Dependencias ---
@@ -147,8 +148,7 @@ def crear_preferencia(request):
 
         return Response({'error': error_message}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-# Webhook de Mercado Pago
+#
 @api_view(['POST']) 
 @csrf_exempt 
 @transaction.atomic
@@ -158,38 +158,42 @@ def webhook_mp(request):
 
         topic = request.GET.get('topic') or request.GET.get('type')
         resource_id = request.GET.get('id') or request.GET.get('data.id')
-
+        
+        internal_order_id = None
+        
         try:
+
             if topic == 'payment' and resource_id:
                 payment_info = client.payment().get(resource_id)
                 
                 mp_status = payment_info['response']['status']
                 internal_order_id = payment_info['response']['external_reference']
-                
-                if internal_order_id:
-                    pedido = Donacion.objects.select_for_update().get(pk=internal_order_id) 
-                    
-                    if mp_status == 'approved' and pedido.estado == 'pendiente':
-                        
-                        fecha_actual = timezone.now() # 🛑 Uso de timezone.now() para evitar RuntimeWarning
-                        
-                        pedido.fecha_donacion = fecha_actual
-                        pedido.estado = 'validado'
-                        pedido.pago_id = resource_id
-                        pedido.save() 
-                        
-                    elif mp_status == 'rejected' and pedido.estado == 'pendiente':
-                        pedido.estado = 'rechazado'
-                        pedido.pago_id = resource_id
-                        pedido.save()
 
-        except Donacion.DoesNotExist:
-            pass
-            
+                if internal_order_id:
+                    try:
+                        pedido = Donacion.objects.select_for_update().get(pk=internal_order_id) 
+                        
+                        if mp_status == 'approved' and pedido.estado == 'pendiente':   
+                            fecha_actual = timezone.now()                          
+                            pedido.fecha_donacion = fecha_actual
+                            pedido.estado = 'validado'
+                            pedido.pago_id = resource_id
+                            pedido.save() 
+                            
+                        elif mp_status == 'rejected' and pedido.estado == 'pendiente':
+                            pedido.estado = 'rechazado'
+                            pedido.pago_id = resource_id
+                            pedido.save()
+                    
+                    except django.db.utils.OperationalError:
+                        pass
+                    except Donacion.DoesNotExist:
+                        pass
+
         except Exception as e:
             import traceback 
             traceback.print_exc()
-
+            
         return HttpResponse(status=200) 
     
-    return HttpResponse(status=405)
+    return HttpResponse(status=405) # Método no permitido
