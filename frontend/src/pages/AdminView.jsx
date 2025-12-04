@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios'; 
 import { useAuth } from '../context/AuthContext'; 
 import { getAnuncios, createAnuncio, deleteAnuncio, updateAnuncio } from "../services/anunciosService";
 import { getLibrosCuentas, deleteLibroCuenta } from "../services/TesoreroService";
@@ -12,9 +11,6 @@ function AdminView() {
 
     const [anuncios, setAnuncios] = useState([]);
     const [librosCuentas, setLibrosCuentas] = useState([]);
-    // Estado para mensajes de contacto
-    const [mensajesContacto, setMensajesContacto] = useState([]);
-
     const [titulo, setTitulo] = useState("");
     const [descripcion, setDescripcion] = useState("");
     const [imagen, setImagen] = useState("");
@@ -22,17 +18,9 @@ function AdminView() {
     const [editandoId, setEditandoId] = useState(null);
     const [loadingLibros, setLoadingLibros] = useState(true);
 
-    // Estado para el modal de ver mensaje completo
-    const [mensajeSeleccionado, setMensajeSeleccionado] = useState(null);
-
-    // --- ESTADOS PARA PAGINACION DE MENSAJES ---
-    const [paginaActual, setPaginaActual] = useState(1);
-    const mensajesPorPagina = 10;
-
     useEffect(() => {
       cargarAnuncios();
       cargarLibrosCuentas();
-      cargarMensajesContacto(); // Cargar mensajes al inicio
     }, []);
 
     const cargarAnuncios = async () => {
@@ -49,35 +37,6 @@ function AdminView() {
       } finally {
         setLoadingLibros(false);
       }
-    };
-
-    // Funcion para cargar los mensajes de contacto
-    const cargarMensajesContacto = async () => {
-        try {
-            const response = await axios.get('http://127.0.0.1:8000/api/contacto/');
-            setMensajesContacto(response.data);
-        } catch (error) {
-            console.error("Error cargando mensajes de contacto", error);
-        }
-    };
-
-    // Funcion para eliminar mensajes
-    const handleEliminarMensaje = async (id) => {
-        if (window.confirm("¿Estás seguro de borrar este mensaje?")) {
-            try {
-                await axios.delete(`http://127.0.0.1:8000/api/contacto/${id}/`);
-                setMensajesContacto(mensajesContacto.filter(msg => msg.id !== id));
-
-                // Si borramos el ultimo mensaje de una pagina, retrocedemos
-                if (mensajesActuales.length === 1 && paginaActual > 1) {
-                    setPaginaActual(paginaActual - 1);
-                }
-                alert("Mensaje eliminado correctamente");
-            } catch (error) {
-                console.error("Error borrando mensaje", error);
-                alert("Hubo un error al eliminar el mensaje");
-            }
-        }
     };
 
     const handleEliminar = async (id, titulo) => {
@@ -166,29 +125,6 @@ function AdminView() {
         return `http://127.0.0.1:8000${archivoPath}`;
     };
 
-    // Funciones para el Modal de Mensaje
-    const abrirModalMensaje = (mensaje) => {
-        setMensajeSeleccionado(mensaje);
-    };
-
-    const cerrarModalMensaje = () => {
-        setMensajeSeleccionado(null);
-    };
-
-    // --- LOGICA DE PAGINACION ---
-    const indiceUltimoMensaje = paginaActual * mensajesPorPagina;
-    const indicePrimerMensaje = indiceUltimoMensaje - mensajesPorPagina;
-    const mensajesActuales = mensajesContacto.slice(indicePrimerMensaje, indiceUltimoMensaje);
-    const totalPaginas = Math.ceil(mensajesContacto.length / mensajesPorPagina);
-
-    const irPaginaSiguiente = () => {
-        if (paginaActual < totalPaginas) setPaginaActual(paginaActual + 1);
-    };
-
-    const irPaginaAnterior = () => {
-        if (paginaActual > 1) setPaginaActual(paginaActual - 1);
-    };
-
     return (
         <div 
             style={{
@@ -238,7 +174,7 @@ function AdminView() {
                     </div>
                 </div>
 
-                <div className="flex gap-6 mb-8">
+                <div className="flex gap-6">
                     <div className="flex-1 bg-white rounded-lg shadow-md p-6">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-2xl font-bold">Anuncios actuales</h2>
@@ -434,152 +370,6 @@ function AdminView() {
                         )}
                     </div>
                 </div>
-
-                {/* --- SECCIÓN: TABLA DE SOLICITUDES DE CONTACTO CON PAGINACION --- */}
-                <div className="bg-white rounded-lg shadow-md p-6 mt-8">
-                    <h2 className="text-2xl font-bold text-gray-800 mb-6 border-b pb-4">
-                        Solicitudes de Contacto Web
-                    </h2>
-
-                    {mensajesContacto.length === 0 ? (
-                        <p className="text-gray-500 text-center py-4">No hay mensajes nuevos.</p>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full leading-normal">
-                                <thead>
-                                    <tr>
-                                        <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                            Fecha
-                                        </th>
-                                        <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                            Nombre
-                                        </th>
-                                        <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                            Correo
-                                        </th>
-                                        <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                            Mensaje
-                                        </th>
-                                        <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                            Acciones
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {mensajesActuales.map((msg) => (
-                                        <tr key={msg.id}>
-                                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                                                {formatearFecha(msg.fecha)}
-                                            </td>
-                                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm font-medium">
-                                                {msg.nombre}
-                                            </td>
-                                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm text-blue-600">
-                                                <a href={`mailto:${msg.correo}`}>{msg.correo}</a>
-                                            </td>
-                                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm text-gray-500">
-                                                {/* Mostrar mensaje cortado si es muy largo visualmente */}
-                                                {msg.mensaje.length > 50 ? msg.mensaje.substring(0, 50) + "..." : msg.mensaje}
-                                            </td>
-                                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                                                <div className="flex gap-2">
-                                                    <button 
-                                                        onClick={() => abrirModalMensaje(msg)}
-                                                        className="bg-blue-100 text-blue-600 hover:bg-blue-200 hover:text-blue-900 font-bold py-1 px-3 rounded text-xs transition duration-200"
-                                                    >
-                                                        Ver
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => handleEliminarMensaje(msg.id)}
-                                                        className="bg-red-100 text-red-600 hover:bg-red-200 hover:text-red-900 font-bold py-1 px-3 rounded text-xs transition duration-200"
-                                                    >
-                                                        Borrar
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-
-                            {/* Controles de Paginacion */}
-                            {totalPaginas > 1 && (
-                                <div className="flex justify-between items-center mt-4">
-                                    <button 
-                                        onClick={irPaginaAnterior}
-                                        disabled={paginaActual === 1}
-                                        className={`px-4 py-2 rounded ${paginaActual === 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-                                    >
-                                        Anterior
-                                    </button>
-                                    
-                                    <span className="text-gray-700">
-                                        Página {paginaActual} de {totalPaginas}
-                                    </span>
-
-                                    <button 
-                                        onClick={irPaginaSiguiente}
-                                        disabled={paginaActual === totalPaginas}
-                                        className={`px-4 py-2 rounded ${paginaActual === totalPaginas ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-                                    >
-                                        Siguiente
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-
-                {/* MODAL CORREGIDO */}
-                {mensajeSeleccionado && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                        <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden">
-                            <div className="bg-gray-100 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                                <h3 className="text-xl font-bold text-gray-800">Detalle del Mensaje</h3>
-                                <button 
-                                    onClick={cerrarModalMensaje}
-                                    className="text-gray-500 hover:text-gray-700 font-bold text-xl"
-                                >
-                                    &times;
-                                </button>
-                            </div>
-                            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-                                <div className="grid grid-cols-2 gap-4 text-sm border-b pb-4">
-                                    <div>
-                                        <p className="text-gray-500 font-semibold">Fecha:</p>
-                                        <p>{formatearFecha(mensajeSeleccionado.fecha)}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-gray-500 font-semibold">Remitente:</p>
-                                        <p>{mensajeSeleccionado.nombre}</p>
-                                    </div>
-                                    <div className="col-span-2">
-                                        <p className="text-gray-500 font-semibold">Correo:</p>
-                                        <a href={`mailto:${mensajeSeleccionado.correo}`} className="text-blue-600 hover:underline">
-                                            {mensajeSeleccionado.correo}
-                                        </a>
-                                    </div>
-                                </div>
-                                <div>
-                                    <p className="text-gray-500 font-semibold mb-2">Mensaje:</p>
-                                    
-                                    <p className="text-gray-800 whitespace-pre-wrap break-words leading-relaxed p-4 bg-gray-50 rounded-lg border">
-                                        {mensajeSeleccionado.mensaje}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end">
-                                <button 
-                                    onClick={cerrarModalMensaje}
-                                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
-                                >
-                                    Cerrar
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
             </div>
         </div>
     );

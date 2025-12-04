@@ -1,6 +1,11 @@
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from .models import Anuncio, LibroCuenta, Mensaje, Contacto
 from rest_framework import serializers
+
+from .models import Anuncio, LibroCuenta, Mensaje, Donacion 
+
+# -----------------------------------------------------------
+# SERIALIZER DE TOKEN (JWT)
+# -----------------------------------------------------------
 
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
@@ -10,6 +15,10 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['is_admin'] = user.is_staff 
         token['is_tesorero'] = user.groups.filter(name='Tesorero').exists()
         return token
+
+# -----------------------------------------------------------
+# SERIALIZERS EXISTENTES
+# -----------------------------------------------------------
 
 class AnuncioSerializer(serializers.ModelSerializer):
     class Meta:
@@ -22,7 +31,7 @@ class LibroCuentaSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class MensajeSerializer(serializers.ModelSerializer):
-    # Campos de solo lectura para mostrar información adicional
+
     emisor_display = serializers.SerializerMethodField()
     destinatario_display = serializers.SerializerMethodField()
     
@@ -31,15 +40,22 @@ class MensajeSerializer(serializers.ModelSerializer):
         fields = '__all__'
     
     def get_emisor_display(self, obj):
+
         return obj.get_emisor_tipo_display()
     
     def get_destinatario_display(self, obj):
+
         return obj.get_destinatario_tipo_display()
-    
 
-# SERIALIZER PAL FORMULARIO
+# -----------------------------------------------------------
+# SERIALIZER REQUERIDO PARA MERCADO PAGO
+# -----------------------------------------------------------
 
-class ContactoSerializer(serializers.ModelSerializer):
+class DonacionSerializer(serializers.ModelSerializer):
+    """
+    Serializer para el modelo Donacion, utilizado para registrar y consultar
+    el estado de los pagos de Mercado Pago.
+    """
     class Meta:
-        model = Contacto
+        model = Donacion
         fields = '__all__'
