@@ -37,7 +37,7 @@ function AdminView() {
     const [filtroFecha, setFiltroFecha] = useState('');
     const [filtroOrden, setFiltroOrden] = useState('recientes');
 
-    // ESTADOS PARA SOLICITUDES DE INGRESO (del primer código)
+    // ESTADOS PARA SOLICITUDES DE INGRESO
     const [paginaSolicitudes, setPaginaSolicitudes] = useState(1);
     const solicitudesPorPagina = 5; 
     const [tabActiva, setTabActiva] = useState('PENDIENTES'); 
@@ -47,7 +47,7 @@ function AdminView() {
       cargarLibrosCuentas();
       cargarMensajesContacto();
       cargarEventosCalendario();
-      cargarSolicitudesIngreso(); // Nueva función del primer código
+      cargarSolicitudesIngreso();
     }, []);
 
     const cargarAnuncios = async () => {
@@ -77,16 +77,24 @@ function AdminView() {
     
     const cargarEventosCalendario = async () => {
         try {
+            console.log('🔍 Iniciando carga de eventos...');
             const authTokens = JSON.parse(localStorage.getItem('authTokens'));
             const token = authTokens?.access;
             
             console.log('Token obtenido:', token ? 'Sí' : 'No');
+            
+            if (!token) {
+                console.error('No hay token disponible');
+                setCargandoCalendario(false);
+                return;
+            }
             
             const response = await axios.get('http://127.0.0.1:8000/api/eventos-calendario/', {
                 headers: { 
                     Authorization: `Bearer ${token}` 
                 }
             });
+            console.log('✅ Eventos cargados:', response.data);
             setEventosCalendario(response.data);
         } catch (error) {
             console.error("Error cargando eventos:", error.response?.data || error.message);
@@ -95,7 +103,6 @@ function AdminView() {
         }
     };
 
-    // NUEVA: FUNCIÓN PARA CARGAR SOLICITUDES DE INGRESO (del primer código)
     const cargarSolicitudesIngreso = async () => {
         try {
             let authTokens = localStorage.getItem('authTokens') ? JSON.parse(localStorage.getItem('authTokens')) : null;
@@ -172,17 +179,11 @@ function AdminView() {
         }
     };
 
-    // NUEVA: FUNCIÓN PARA ELIMINAR MENSAJES DE CONTACTO (del primer código)
     const handleEliminarMensaje = async (id) => {
         if (window.confirm("¿Estás seguro de borrar este mensaje?")) {
             try {
                 await axios.delete(`http://127.0.0.1:8000/api/contacto/${id}/`);
                 setMensajesContacto(mensajesContacto.filter(msg => msg.id !== id));
-
-                // Si borramos el ultimo mensaje de una pagina, retrocedemos
-                if (mensajesActuales.length === 1 && paginaActual > 1) {
-                    setPaginaActual(paginaActual - 1);
-                }
                 alert("Mensaje eliminado correctamente");
             } catch (error) {
                 console.error("Error borrando mensaje", error);
@@ -217,13 +218,12 @@ function AdminView() {
         }
     };
 
-    // NUEVAS: FUNCIONES PARA SOLICITUDES DE INGRESO (del primer código)
     const handleEstadoSolicitud = async (id, nuevoEstado) => {
         try {
             let authTokens = localStorage.getItem('authTokens') ? JSON.parse(localStorage.getItem('authTokens')) : null;
 
             await axios.patch(`http://127.0.0.1:8000/api/admin/solicitudes/${id}/`, 
-                { estado: nuevoEstado }, // Datos
+                { estado: nuevoEstado },
                 { 
                     headers: {
                         'Authorization': `Bearer ${authTokens?.access}`
@@ -249,7 +249,7 @@ function AdminView() {
             await axios.delete(`http://127.0.0.1:8000/api/admin/solicitudes/${id}/`, { 
                 headers: { 'Authorization': `Bearer ${authTokens?.access}` }
             });
-            cargarSolicitudesIngreso(); // Recargar lista
+            cargarSolicitudesIngreso();
             alert("Registro eliminado.");
         } catch (error) {
             console.error(error);
@@ -257,7 +257,6 @@ function AdminView() {
         }
     };
 
-    // NUEVA: Ayuda visual para los colores de las etiquetas de estado (del primer código)
     const getBadgeColor = (estado) => {
         switch(estado) {
             case 'APROBADO': return 'bg-green-100 text-green-800 border-green-200';
@@ -334,11 +333,9 @@ function AdminView() {
         setMensajeSeleccionado(null);
     };
 
-    // NUEVA FUNCIÓN: Filtrar mensajes
     const filtrarMensajes = () => {
         let mensajesFiltrados = [...mensajesContacto];
         
-        // Filtrar por búsqueda (nombre o correo)
         if (filtroBusqueda) {
             const busqueda = filtroBusqueda.toLowerCase();
             mensajesFiltrados = mensajesFiltrados.filter(msg => 
@@ -348,7 +345,6 @@ function AdminView() {
             );
         }
         
-        // Filtrar por fecha
         if (filtroFecha) {
             const fechaSeleccionada = new Date(filtroFecha).toDateString();
             mensajesFiltrados = mensajesFiltrados.filter(msg => {
@@ -357,7 +353,6 @@ function AdminView() {
             });
         }
         
-        // Ordenar
         if (filtroOrden === 'recientes') {
             mensajesFiltrados.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
         } else if (filtroOrden === 'antiguos') {
@@ -369,7 +364,6 @@ function AdminView() {
         return mensajesFiltrados;
     };
 
-    // NUEVA FUNCIÓN: Limpiar filtros
     const limpiarFiltros = () => {
         setFiltroBusqueda('');
         setFiltroFecha('');
@@ -377,7 +371,6 @@ function AdminView() {
         setPaginaActual(1);
     };
 
-    // Usar mensajes filtrados
     const mensajesFiltrados = filtrarMensajes();
     const indiceUltimoMensaje = paginaActual * mensajesPorPagina;
     const indicePrimerMensaje = indiceUltimoMensaje - mensajesPorPagina;
@@ -392,7 +385,6 @@ function AdminView() {
         if (paginaActual > 1) setPaginaActual(paginaActual - 1);
     };
 
-    // FUNCIÓN PARA RENDERIZAR LA SECCIÓN ACTIVA
     const renderSeccionActiva = () => {
         switch(seccionActiva) {
             case 'anuncios':
@@ -403,14 +395,13 @@ function AdminView() {
                 return renderCalendario();
             case 'contacto':
                 return renderContacto();
-            case 'solicitudes': // NUEVA SECCIÓN
+            case 'solicitudes':
                 return renderSolicitudes();
             default:
                 return renderAnuncios();
         }
     };
 
-    // FUNCIONES DE RENDERIZADO PARA CADA SECCIÓN
     const renderAnuncios = () => (
         <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex justify-between items-center mb-6">
@@ -482,7 +473,6 @@ function AdminView() {
                 </div>
             )}
 
-            {/* MODAL/TARJETA DE FORMULARIO - SOLO APARECE CUANDO mostrarForm ES true */}
             {mostrarForm && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-xl overflow-hidden">
@@ -501,7 +491,6 @@ function AdminView() {
                         <div className="max-h-[70vh] overflow-y-auto">
                             <form onSubmit={handleGuardar}>
                                 <div className="p-6 space-y-6">
-                                    {/* TÍTULO */}
                                     <div>
                                         <label className="block mb-2">
                                             <span className="block text-sm font-semibold text-gray-700 mb-2">Título:</span>
@@ -515,7 +504,6 @@ function AdminView() {
                                         </label>
                                     </div>
 
-                                    {/* DESCRIPCIÓN */}
                                     <div>
                                         <label className="block mb-2">
                                             <span className="block text-sm font-semibold text-gray-700 mb-2">Descripción:</span>
@@ -529,7 +517,6 @@ function AdminView() {
                                         </label>
                                     </div>
 
-                                    {/* URL DE IMAGEN */}
                                     <div>
                                         <label className="block mb-2">
                                             <span className="block text-sm font-semibold text-gray-700 mb-2">URL de Imagen (opcional):</span>
@@ -546,7 +533,6 @@ function AdminView() {
                                         </label>
                                     </div>
 
-                                    {/* VISTA PREVIA */}
                                     {imagen && (
                                         <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
                                             <p className="text-sm font-medium text-gray-700 mb-2">Vista previa:</p>
@@ -664,10 +650,8 @@ function AdminView() {
                 </div>
             </div>
 
-            {/* FILTROS COMPACTOS */}
             <div className="bg-gray-50 rounded-lg p-4 mb-6">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    {/* Barra de búsqueda */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             Buscar:
@@ -681,7 +665,6 @@ function AdminView() {
                         />
                     </div>
                     
-                    {/* Filtro por fecha */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             Fecha:
@@ -694,7 +677,6 @@ function AdminView() {
                         />
                     </div>
                     
-                    {/* Ordenar por */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             Ordenar:
@@ -710,7 +692,6 @@ function AdminView() {
                         </select>
                     </div>
                     
-                    {/* Botón limpiar filtros */}
                     <div className="flex items-end">
                         <button
                             onClick={limpiarFiltros}
@@ -721,7 +702,6 @@ function AdminView() {
                     </div>
                 </div>
                 
-                {/* Resumen de filtros activos */}
                 <div className="mt-3 flex flex-wrap gap-2">
                     {filtroBusqueda && (
                         <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
@@ -746,7 +726,6 @@ function AdminView() {
                 </div>
             </div>
 
-            {/* TABLA MÁS COMPACTA */}
             <div className="overflow-x-auto">
                 {mensajesFiltrados.length === 0 ? (
                     <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
@@ -835,7 +814,6 @@ function AdminView() {
                 )}
             </div>
 
-            {/* Paginación */}
             {totalPaginas > 1 && (
                 <div className="flex justify-between items-center mt-4 p-3 bg-gray-50 rounded-lg">
                     <button 
@@ -864,14 +842,11 @@ function AdminView() {
         </div>
     );
 
-    // NUEVA: RENDERIZADO DE SOLICITUDES DE INGRESO (del primer código)
     const renderSolicitudes = () => {
-        // 1. Filtrar según la pestaña activa
         const solicitudesFiltradas = solicitudesIngreso.filter(s => 
             tabActiva === 'PENDIENTES' ? s.estado === 'PENDIENTE' : s.estado !== 'PENDIENTE'
         );
 
-        // 2. Calcular paginación sobre los filtrados
         const indiceUltimo = paginaSolicitudes * solicitudesPorPagina;
         const indicePrimero = indiceUltimo - solicitudesPorPagina;
         const solicitudesVisibles = solicitudesFiltradas.slice(indicePrimero, indiceUltimo);
@@ -879,11 +854,9 @@ function AdminView() {
 
         return (
             <div className="bg-white rounded-lg shadow-md p-6">
-                {/* ENCABEZADO CON PESTAÑAS */}
                 <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4">
                     <h2 className="text-2xl font-bold text-gray-800">Solicitudes de Ingreso</h2>
                     
-                    {/* BOTONES DE PESTAÑAS */}
                     <div className="flex bg-gray-100 p-1 rounded-lg mt-4 md:mt-0">
                         <button
                             onClick={() => { setTabActiva('PENDIENTES'); setPaginaSolicitudes(1); }}
@@ -967,7 +940,6 @@ function AdminView() {
                             </table>
                         </div>
 
-                        {/* CONTROLES DE PAGINACIÓN (Solo si hay más de 1 página) */}
                         {totalPaginasSol > 1 && (
                             <div className="flex justify-between items-center mt-4 border-t pt-4">
                                 <button 
@@ -1008,7 +980,6 @@ function AdminView() {
                 margin: '-20px',
                 padding: '20px'
             }}>
-                {/* Header (se mantiene igual) */}
                 <div 
                     className="rounded-lg shadow-md p-6 mb-6"
                     style={{
@@ -1043,9 +1014,7 @@ function AdminView() {
                     </div>
                 </div>
 
-                {/* Contenedor principal con navegación y contenido */}
                 <div className="flex gap-4">
-                    {/* Sidebar de navegación (izquierda) */}
                     <div style={{
                         width: '220px',
                         display: 'flex',
@@ -1077,16 +1046,6 @@ function AdminView() {
                                         gap: '10px',
                                         fontSize: '14px'
                                     }}
-                                    onMouseEnter={(e) => {
-                                        if (seccionActiva !== 'anuncios') {
-                                            e.target.style.backgroundColor = '#f3f4f6';
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        if (seccionActiva !== 'anuncios') {
-                                            e.target.style.backgroundColor = 'transparent';
-                                        }
-                                    }}
                                 >
                                     <span>📢</span>
                                     <span>Anuncios</span>
@@ -1109,16 +1068,6 @@ function AdminView() {
                                         alignItems: 'center',
                                         gap: '10px',
                                         fontSize: '14px'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        if (seccionActiva !== 'libros') {
-                                            e.target.style.backgroundColor = '#f3f4f6';
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        if (seccionActiva !== 'libros') {
-                                            e.target.style.backgroundColor = 'transparent';
-                                        }
                                     }}
                                 >
                                     <span>📚</span>
@@ -1143,22 +1092,11 @@ function AdminView() {
                                         gap: '10px',
                                         fontSize: '14px'
                                     }}
-                                    onMouseEnter={(e) => {
-                                        if (seccionActiva !== 'calendario') {
-                                            e.target.style.backgroundColor = '#f3f4f6';
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        if (seccionActiva !== 'calendario') {
-                                            e.target.style.backgroundColor = 'transparent';
-                                        }
-                                    }}
                                 >
                                     <span>📅</span>
                                     <span>Calendario</span>
                                 </button>
 
-                                {/* NUEVO: Botón para Solicitudes de Ingreso */}
                                 <button 
                                     onClick={() => setSeccionActiva('solicitudes')}
                                     style={{
@@ -1176,16 +1114,6 @@ function AdminView() {
                                         alignItems: 'center',
                                         gap: '10px',
                                         fontSize: '14px'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        if (seccionActiva !== 'solicitudes') {
-                                            e.target.style.backgroundColor = '#f3f4f6';
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        if (seccionActiva !== 'solicitudes') {
-                                            e.target.style.backgroundColor = 'transparent';
-                                        }
                                     }}
                                 >
                                     <span>👥</span>
@@ -1210,16 +1138,6 @@ function AdminView() {
                                         gap: '10px',
                                         fontSize: '14px'
                                     }}
-                                    onMouseEnter={(e) => {
-                                        if (seccionActiva !== 'contacto') {
-                                            e.target.style.backgroundColor = '#f3f4f6';
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        if (seccionActiva !== 'contacto') {
-                                            e.target.style.backgroundColor = 'transparent';
-                                        }
-                                    }}
                                 >
                                     <span>✉️</span>
                                     <span>Solicitudes Contacto</span>
@@ -1228,12 +1146,10 @@ function AdminView() {
                         </div>
                     </div>
 
-                    {/* Contenido principal (centro) */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                         {renderSeccionActiva()}
                     </div>
 
-                    {/* Sidebar de Mensajes FIJO SOLO (derecha) - SIN Libros de Cuentas */}
                     <div style={{ 
                         width: '380px',
                         flexShrink: 0
@@ -1242,7 +1158,6 @@ function AdminView() {
                     </div>
                 </div>
 
-                {/* Modal de Mensaje (se mantiene igual) */}
                 {mensajeSeleccionado && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
                         <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden">
