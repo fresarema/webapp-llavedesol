@@ -1,7 +1,5 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-
-
 from .views import (
     MyTokenObtainPairView,
     AnuncioViewSet, 
@@ -13,7 +11,8 @@ from .views import (
     CrearSolicitudView,
     ListarSolicitudesView,
     ActualizarSolicitudView,
-     EventoCalendarioViewSet
+    EventoCalendarioViewSet,
+    aprobar_solicitud_con_usuario  # <-- NUEVA IMPORTACIÓN
 )
 
 router = DefaultRouter()
@@ -24,21 +23,25 @@ router.register(r'contacto', ContactoViewSet)
 router.register(r'eventos-calendario', EventoCalendarioViewSet)
 
 urlpatterns = [
-
+    # Autenticación
     path('token/', MyTokenObtainPairView.as_view(), name='token_obtain_pair'),
     
-
+    # Rutas del router
     path('', include(router.urls)),
+    
+    # Solicitudes de ingreso
     path('solicitud-ingreso/', CrearSolicitudView.as_view(), name='crear_solicitud'),
     path('admin/solicitudes/', ListarSolicitudesView.as_view(), name='listar_solicitudes'),
     path('admin/solicitudes/<int:pk>/', ActualizarSolicitudView.as_view(), name='actualizar_solicitud'),
     
+    # NUEVA RUTA: Aprobar y crear usuario automático
+    path('admin/solicitudes/<int:solicitud_id>/aprobar-con-usuario/', 
+         aprobar_solicitud_con_usuario, 
+         name='aprobar_solicitud_con_usuario'),
+    
     # --------------------------------------------------------
     # RUTAS PARA MERCADO PAGO
     # --------------------------------------------------------
-    
     path('crear-preferencia/', crear_preferencia, name='crear_preferencia'),
-    
-    # Endpoint de Webhook
     path('webhook-mercadopago/', webhook_mp, name='webhook_mp'),
 ]

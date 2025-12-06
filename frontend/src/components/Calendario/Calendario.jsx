@@ -28,7 +28,7 @@ const Calendario = ({
   const [mostrarModal, setMostrarModal] = useState(false);
   const [eventoSeleccionado, setEventoSeleccionado] = useState(null);
   
-  // Formulario
+  // Formulario (solo para admin)
   const [formEvento, setFormEvento] = useState({
     titulo: '',
     descripcion: '',
@@ -70,7 +70,7 @@ const Calendario = ({
     return dias;
   };
 
-  // Manejar clic en día
+  // Manejar clic en día (SOLO para admin)
   const handleDayClick = (dia) => {
     if (modo !== 'admin') return;
     
@@ -88,19 +88,22 @@ const Calendario = ({
     setMostrarModal(true);
   };
 
-  // Manejar clic en evento
+  // Manejar clic en evento (AMBOS modos)
   const handleEventClick = (evento) => {
-    if (modo !== 'admin') return;
-    
     setEventoSeleccionado(evento);
-    setFormEvento({
-      titulo: evento.titulo || '',
-      descripcion: evento.descripcion || '',
-      fecha: evento.fecha || format(new Date(), 'yyyy-MM-dd'),
-      hora_inicio: evento.hora_inicio || '09:00',
-      hora_fin: evento.hora_fin || '17:00',
-      tipo_evento: evento.tipo_evento || 'REUNION'
-    });
+    
+    if (modo === 'admin') {
+      // Para admin: carga formulario para editar
+      setFormEvento({
+        titulo: evento.titulo || '',
+        descripcion: evento.descripcion || '',
+        fecha: evento.fecha || format(new Date(), 'yyyy-MM-dd'),
+        hora_inicio: evento.hora_inicio || '09:00',
+        hora_fin: evento.hora_fin || '17:00',
+        tipo_evento: evento.tipo_evento || 'REUNION'
+      });
+    }
+    
     setMostrarModal(true);
   };
 
@@ -111,7 +114,7 @@ const Calendario = ({
     );
   };
 
-  // Guardar evento
+  // Guardar evento (SOLO para admin)
   const guardarEvento = (e) => {
     e.preventDefault();
     
@@ -154,7 +157,7 @@ const Calendario = ({
     cerrarModal();
   };
 
-  // Eliminar evento
+  // Eliminar evento (SOLO para admin)
   const eliminarEvento = () => {
     if (!eventoSeleccionado) return;
     
@@ -183,6 +186,19 @@ const Calendario = ({
     });
   };
 
+  // Función para traducir tipo de evento
+  const traducirTipoEvento = (tipo) => {
+    const traducciones = {
+      'REUNION': 'Reunión',
+      'EVENTO': 'Evento público',
+      'VOLUNTARIADO': 'Voluntariado',
+      'CAPACITACION': 'Capacitación',
+      'RECAUDACION': 'Recaudación de fondos',
+      'ADMINISTRATIVO': 'Administrativo'
+    };
+    return traducciones[tipo] || tipo;
+  };
+
   // =============== RENDER ===============
 
   const dias = generarDias();
@@ -193,15 +209,21 @@ const Calendario = ({
     <div>
       {/* Cabecera del calendario */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <button onClick={() => setFechaActual(subMonths(fechaActual, 1))}>
+        <button 
+          onClick={() => setFechaActual(subMonths(fechaActual, 1))}
+          className="bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 px-4 rounded-lg transition duration-300"
+        >
           ◀ Anterior
         </button>
         
-        <h3>
+        <h3 className="text-xl font-bold text-gray-800">
           {format(fechaActual, 'MMMM yyyy', { locale: es })}
         </h3>
         
-        <button onClick={() => setFechaActual(addMonths(fechaActual, 1))}>
+        <button 
+          onClick={() => setFechaActual(addMonths(fechaActual, 1))}
+          className="bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 px-4 rounded-lg transition duration-300"
+        >
           Siguiente ▶
         </button>
       </div>
@@ -209,7 +231,7 @@ const Calendario = ({
       {/* Días de la semana */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', textAlign: 'center', marginBottom: '10px' }}>
         {diaNames.map(dia => (
-          <div key={dia} style={{ fontWeight: 'bold' }}>{dia}</div>
+          <div key={dia} style={{ fontWeight: 'bold', color: '#4a5568' }}>{dia}</div>
         ))}
       </div>
 
@@ -225,7 +247,7 @@ const Calendario = ({
             <div 
               key={dia.toString()}
               style={{
-                border: '1px solid #ddd',
+                border: '1px solid #e2e8f0',
                 minHeight: '100px',
                 padding: '5px',
                 backgroundColor: esOtroMes ? '#f9f9f9' : (esHoy ? '#e8f4fd' : 'white'),
@@ -237,10 +259,11 @@ const Calendario = ({
             >
               <div style={{ 
                 fontWeight: 'bold',
-                color: esPasado ? '#999' : (esHoy ? '#3498db' : '#000')
+                color: esPasado ? '#999' : (esHoy ? '#3498db' : '#000'),
+                marginBottom: '5px'
               }}>
                 {format(dia, 'd')}
-                {esHoy && <span style={{fontSize: '10px', marginLeft: '3px'}}>HOY</span>}
+                {esHoy && <span style={{fontSize: '10px', marginLeft: '3px', color: '#3498db'}}>HOY</span>}
               </div>
               
               {/* Eventos del día */}
@@ -249,18 +272,26 @@ const Calendario = ({
                   key={evento.id}
                   style={{
                     fontSize: '12px',
-                    padding: '2px 4px',
-                    margin: '2px 0',
+                    padding: '4px 6px',
+                    margin: '3px 0',
                     backgroundColor: '#3498db',
                     color: 'white',
-                    borderRadius: '3px',
-                    cursor: modo === 'admin' ? 'pointer' : 'default',
-                    opacity: esPasado ? 0.7 : 1
+                    borderRadius: '4px',
+                    cursor: 'pointer', // ✅ TODOS pueden hacer clic para ver detalles
+                    opacity: esPasado ? 0.7 : 1,
+                    transition: 'all 0.2s',
+                    fontWeight: '500',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
                   }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#2980b9'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#3498db'}
                   onClick={(e) => {
                     e.stopPropagation();
                     handleEventClick(evento);
                   }}
+                  title={`${evento.titulo} (Haz clic para ver detalles)`}
                 >
                   {evento.titulo}
                 </div>
@@ -283,7 +314,7 @@ const Calendario = ({
         })}
       </div>
 
-      {/* Botón para agregar evento */}
+      {/* Botón para agregar evento (SOLO admin) */}
       {modo === 'admin' && (
         <button 
           onClick={() => {
@@ -303,14 +334,14 @@ const Calendario = ({
             });
             setMostrarModal(true);
           }}
-          style={{ marginTop: '20px', padding: '10px 20px' }}
+          className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-6 rounded-lg font-medium transition duration-300 mt-6"
         >
           + Agregar Evento
         </button>
       )}
 
       {/* Modal para evento */}
-      {mostrarModal && modo === 'admin' && (
+      {mostrarModal && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -325,114 +356,365 @@ const Calendario = ({
         }}>
           <div style={{
             backgroundColor: 'white',
-            padding: '20px',
-            borderRadius: '8px',
+            padding: '24px',
+            borderRadius: '12px',
             width: '90%',
-            maxWidth: '500px'
+            maxWidth: '500px',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.2)'
           }}>
-            <h3>{eventoSeleccionado ? 'Editar Evento' : 'Nuevo Evento'}</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#2d3748' }}>
+                {modo === 'admin' ? (eventoSeleccionado ? '✏️ Editar Evento' : '➕ Nuevo Evento') : '📅 Detalles del Evento'}
+              </h3>
+              <button 
+                onClick={cerrarModal}
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  fontSize: '24px', 
+                  cursor: 'pointer',
+                  color: '#718096'
+                }}
+              >
+                &times;
+              </button>
+            </div>
             
-            <form onSubmit={guardarEvento}>
-              {/* Título */}
-              <div style={{ marginBottom: '10px' }}>
-                <label>Título: *</label>
-                <input
-                  type="text"
-                  value={formEvento.titulo}
-                  onChange={(e) => setFormEvento({...formEvento, titulo: e.target.value})}
-                  required
-                  style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-                />
-              </div>
-
-              {/* Fecha */}
-              <div style={{ marginBottom: '10px' }}>
-                <label>Fecha: *</label>
-                <input
-                  type="date"
-                  value={formEvento.fecha}
-                  onChange={(e) => setFormEvento({...formEvento, fecha: e.target.value})}
-                  required
-                  min={format(new Date(), 'yyyy-MM-dd')} // No permite fechas pasadas
-                  style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-                />
-                <small style={{color: '#666'}}>No se permiten fechas pasadas</small>
-              </div>
-
-              {/* Hora inicio/fin */}
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-                <div style={{ flex: 1 }}>
-                  <label>Hora inicio:</label>
+            {modo === 'admin' ? (
+              // ========== FORMULARIO PARA ADMIN ==========
+              <form onSubmit={guardarEvento}>
+                {/* Título */}
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', color: '#4a5568' }}>
+                    Título: *
+                  </label>
                   <input
-                    type="time"
-                    value={formEvento.hora_inicio}
-                    onChange={(e) => setFormEvento({...formEvento, hora_inicio: e.target.value})}
-                    style={{ width: '100%', padding: '8px', marginTop: '5px' }}
+                    type="text"
+                    value={formEvento.titulo}
+                    onChange={(e) => setFormEvento({...formEvento, titulo: e.target.value})}
+                    required
+                    style={{ 
+                      width: '100%', 
+                      padding: '10px', 
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                    placeholder="Nombre del evento"
                   />
                 </div>
-                <div style={{ flex: 1 }}>
-                  <label>Hora fin:</label>
+
+                {/* Fecha */}
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', color: '#4a5568' }}>
+                    Fecha: *
+                  </label>
                   <input
-                    type="time"
-                    value={formEvento.hora_fin}
-                    onChange={(e) => setFormEvento({...formEvento, hora_fin: e.target.value})}
-                    style={{ width: '100%', padding: '8px', marginTop: '5px' }}
+                    type="date"
+                    value={formEvento.fecha}
+                    onChange={(e) => setFormEvento({...formEvento, fecha: e.target.value})}
+                    required
+                    min={format(new Date(), 'yyyy-MM-dd')} // No permite fechas pasadas
+                    style={{ 
+                      width: '100%', 
+                      padding: '10px', 
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                  />
+                  <small style={{color: '#718096', fontSize: '12px'}}>No se permiten fechas pasadas</small>
+                </div>
+
+                {/* Hora inicio/fin */}
+                <div style={{ display: 'flex', gap: '15px', marginBottom: '16px' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', color: '#4a5568' }}>
+                      Hora inicio:
+                    </label>
+                    <input
+                      type="time"
+                      value={formEvento.hora_inicio}
+                      onChange={(e) => setFormEvento({...formEvento, hora_inicio: e.target.value})}
+                      style={{ 
+                        width: '100%', 
+                        padding: '10px', 
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', color: '#4a5568' }}>
+                      Hora fin:
+                    </label>
+                    <input
+                      type="time"
+                      value={formEvento.hora_fin}
+                      onChange={(e) => setFormEvento({...formEvento, hora_fin: e.target.value})}
+                      style={{ 
+                        width: '100%', 
+                        padding: '10px', 
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Tipo de evento */}
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', color: '#4a5568' }}>
+                    Tipo de evento:
+                  </label>
+                  <select
+                    value={formEvento.tipo_evento}
+                    onChange={(e) => setFormEvento({...formEvento, tipo_evento: e.target.value})}
+                    style={{ 
+                      width: '100%', 
+                      padding: '10px', 
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      backgroundColor: 'white'
+                    }}
+                  >
+                    <option value="REUNION">Reunión</option>
+                    <option value="EVENTO">Evento público</option>
+                    <option value="VOLUNTARIADO">Voluntariado</option>
+                    <option value="CAPACITACION">Capacitación</option>
+                    <option value="RECAUDACION">Recaudación de fondos</option>
+                    <option value="ADMINISTRATIVO">Administrativo</option>
+                  </select>
+                </div>
+
+                {/* Descripción */}
+                <div style={{ marginBottom: '25px' }}>
+                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', color: '#4a5568' }}>
+                    Descripción:
+                  </label>
+                  <textarea
+                    value={formEvento.descripcion}
+                    onChange={(e) => setFormEvento({...formEvento, descripcion: e.target.value})}
+                    rows="4"
+                    style={{ 
+                      width: '100%', 
+                      padding: '10px', 
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      resize: 'vertical'
+                    }}
+                    placeholder="Descripción detallada del evento..."
                   />
                 </div>
-              </div>
 
-              {/* Tipo de evento */}
-              <div style={{ marginBottom: '10px' }}>
-                <label>Tipo de evento:</label>
-                <select
-                  value={formEvento.tipo_evento}
-                  onChange={(e) => setFormEvento({...formEvento, tipo_evento: e.target.value})}
-                  style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-                >
-                  <option value="REUNION">Reunión</option>
-                  <option value="EVENTO">Evento público</option>
-                  <option value="VOLUNTARIADO">Voluntariado</option>
-                  <option value="CAPACITACION">Capacitación</option>
-                  <option value="RECAUDACION">Recaudación de fondos</option>
-                  <option value="ADMINISTRATIVO">Administrativo</option>
-                </select>
-              </div>
-
-              {/* Descripción */}
-              <div style={{ marginBottom: '20px' }}>
-                <label>Descripción:</label>
-                <textarea
-                  value={formEvento.descripcion}
-                  onChange={(e) => setFormEvento({...formEvento, descripcion: e.target.value})}
-                  rows="3"
-                  style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-                />
-              </div>
-
-              {/* Botones */}
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                <button type="submit">
-                  {eventoSeleccionado ? 'Actualizar' : 'Guardar'}
-                </button>
-                
-                {eventoSeleccionado && (
+                {/* Botones ADMIN */}
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                  {eventoSeleccionado && (
+                    <button 
+                      type="button" 
+                      onClick={eliminarEvento}
+                      style={{ 
+                        padding: '10px 20px',
+                        backgroundColor: '#f56565',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        fontSize: '14px',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#e53e3e'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = '#f56565'}
+                    >
+                      Eliminar
+                    </button>
+                  )}
+                  
+                  <button 
+                    type="submit"
+                    style={{ 
+                      padding: '10px 20px',
+                      backgroundColor: '#48bb78',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: '600',
+                      fontSize: '14px',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#38a169'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#48bb78'}
+                  >
+                    {eventoSeleccionado ? 'Actualizar' : 'Guardar'}
+                  </button>
+                  
                   <button 
                     type="button" 
-                    onClick={eliminarEvento}
-                    style={{ backgroundColor: '#ff4444', color: 'white' }}
+                    onClick={cerrarModal}
+                    style={{ 
+                      padding: '10px 20px',
+                      backgroundColor: '#e2e8f0',
+                      color: '#4a5568',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: '600',
+                      fontSize: '14px',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#cbd5e0'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#e2e8f0'}
                   >
-                    Eliminar
+                    Cancelar
                   </button>
+                </div>
+              </form>
+            ) : (
+              // ========== VISTA DE SOLO LECTURA PARA SOCIO ==========
+              <div>
+                {/* Información del evento */}
+                {eventoSeleccionado && (
+                  <div style={{ marginBottom: '25px' }}>
+                    {/* Título */}
+                    <div style={{ marginBottom: '16px' }}>
+                      <div style={{ fontSize: '12px', color: '#718096', marginBottom: '4px', fontWeight: '600' }}>
+                        TÍTULO
+                      </div>
+                      <div style={{ 
+                        fontSize: '18px', 
+                        fontWeight: 'bold', 
+                        color: '#2d3748',
+                        padding: '12px',
+                        backgroundColor: '#f7fafc',
+                        borderRadius: '6px',
+                        borderLeft: '4px solid #3498db'
+                      }}>
+                        {eventoSeleccionado.titulo}
+                      </div>
+                    </div>
+
+                    {/* Fecha y hora */}
+                    <div style={{ display: 'flex', gap: '15px', marginBottom: '16px' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '12px', color: '#718096', marginBottom: '4px', fontWeight: '600' }}>
+                          FECHA
+                        </div>
+                        <div style={{ 
+                          padding: '10px',
+                          backgroundColor: '#f7fafc',
+                          borderRadius: '6px',
+                          fontSize: '14px',
+                          color: '#2d3748'
+                        }}>
+                          {eventoSeleccionado.fecha ? format(parseISO(eventoSeleccionado.fecha), 'dd/MM/yyyy') : 'No especificada'}
+                        </div>
+                      </div>
+                      
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '12px', color: '#718096', marginBottom: '4px', fontWeight: '600' }}>
+                          HORARIO
+                        </div>
+                        <div style={{ 
+                          padding: '10px',
+                          backgroundColor: '#f7fafc',
+                          borderRadius: '6px',
+                          fontSize: '14px',
+                          color: '#2d3748'
+                        }}>
+                          {eventoSeleccionado.hora_inicio && eventoSeleccionado.hora_fin 
+                            ? `${eventoSeleccionado.hora_inicio} - ${eventoSeleccionado.hora_fin}`
+                            : 'Horario no especificado'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Tipo de evento */}
+                    <div style={{ marginBottom: '16px' }}>
+                      <div style={{ fontSize: '12px', color: '#718096', marginBottom: '4px', fontWeight: '600' }}>
+                        TIPO DE EVENTO
+                      </div>
+                      <div style={{ 
+                        padding: '10px',
+                        backgroundColor: '#f7fafc',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        color: '#2d3748'
+                      }}>
+                        {traducirTipoEvento(eventoSeleccionado.tipo_evento)}
+                      </div>
+                    </div>
+
+                    {/* Descripción */}
+                    {eventoSeleccionado.descripcion && (
+                      <div style={{ marginBottom: '16px' }}>
+                        <div style={{ fontSize: '12px', color: '#718096', marginBottom: '4px', fontWeight: '600' }}>
+                          DESCRIPCIÓN
+                        </div>
+                        <div style={{ 
+                          padding: '12px',
+                          backgroundColor: '#f7fafc',
+                          borderRadius: '6px',
+                          fontSize: '14px',
+                          color: '#2d3748',
+                          lineHeight: '1.5'
+                        }}>
+                          {eventoSeleccionado.descripcion}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Estado */}
+                    <div style={{ marginBottom: '25px' }}>
+                      <div style={{ fontSize: '12px', color: '#718096', marginBottom: '4px', fontWeight: '600' }}>
+                        ESTADO
+                      </div>
+                      <div style={{ 
+                        padding: '10px',
+                        backgroundColor: '#f0fff4',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        color: '#276749',
+                        fontWeight: '600',
+                        border: '1px solid #9ae6b4'
+                      }}>
+                        ✅ Evento programado
+                      </div>
+                    </div>
+                  </div>
                 )}
-                
-                <button 
-                  type="button" 
-                  onClick={cerrarModal}
-                >
-                  Cancelar
-                </button>
+
+                {/* Botón único para SOCIO */}
+                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                  <button 
+                    type="button" 
+                    onClick={cerrarModal}
+                    style={{ 
+                      padding: '12px 30px',
+                      backgroundColor: '#3498db',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: '600',
+                      fontSize: '14px',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#2980b9'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#3498db'}
+                  >
+                    Cerrar
+                  </button>
+                </div>
               </div>
-            </form>
+            )}
           </div>
         </div>
       )}

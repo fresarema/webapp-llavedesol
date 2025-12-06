@@ -17,6 +17,7 @@ function AdminView() {
     const [eventosCalendario, setEventosCalendario] = useState([]);
     const [solicitudesIngreso, setSolicitudesIngreso] = useState([]);
     const [cargandoCalendario, setCargandoCalendario] = useState(true);
+    const [cargandoSolicitudes, setCargandoSolicitudes] = useState(false);
 
     const [titulo, setTitulo] = useState("");
     const [descripcion, setDescripcion] = useState("");
@@ -105,10 +106,12 @@ function AdminView() {
 
     const cargarSolicitudesIngreso = async () => {
         try {
+            setCargandoSolicitudes(true);
             let authTokens = localStorage.getItem('authTokens') ? JSON.parse(localStorage.getItem('authTokens')) : null;
             
             if (!authTokens) {
                 console.error("No hay token de acceso. ¿Estás logueado?");
+                setCargandoSolicitudes(false);
                 return;
             }
 
@@ -118,9 +121,22 @@ function AdminView() {
                 }
             });
             
-            setSolicitudesIngreso(response.data);
+            // ✅ Asegurarse de que los datos tengan contraseña si existe
+            const solicitudesConPassword = response.data.map(solicitud => ({
+                ...solicitud,
+                // Si existe password_generada en los datos del backend, incluirla
+                password_generada: solicitud.password_generada || null
+            }));
+            
+            setSolicitudesIngreso(solicitudesConPassword);
         } catch (error) {
             console.error("Error cargando solicitudes de ingreso", error);
+            if (error.response?.status === 401) {
+                alert("Tu sesión ha expirado. Por favor, inicia sesión nuevamente.");
+                logoutUser();
+            }
+        } finally {
+            setCargandoSolicitudes(false);
         }
     };
 
@@ -218,24 +234,141 @@ function AdminView() {
         }
     };
 
+    // FUNCIÓN MEJORADA - CREA USUARIO AUTOMÁTICO Y LO ASIGNA AL GRUPO SOCIO
     const handleEstadoSolicitud = async (id, nuevoEstado) => {
         try {
             let authTokens = localStorage.getItem('authTokens') ? JSON.parse(localStorage.getItem('authTokens')) : null;
 
-            await axios.patch(`http://127.0.0.1:8000/api/admin/solicitudes/${id}/`, 
-                { estado: nuevoEstado },
-                { 
-                    headers: {
-                        'Authorization': `Bearer ${authTokens?.access}`
+            if (!authTokens || !authTokens.access) {
+                alert("No estás autenticado. Por favor, inicia sesión.");
+                return;
+            }
+
+            console.log(`Procesando solicitud ${id} con estado ${nuevoEstado}`);
+
+            if (nuevoEstado === 'APROBADO') {
+                // Usar la nueva URL que crea usuario automático
+                const response = await axios.post(
+                    `http://127.0.0.1:8000/api/admin/solicitudes/${id}/aprobar-con-usuario/`, 
+                    {},  // cuerpo vacío
+                    { 
+                        headers: {
+                            'Authorization': `Bearer ${authTokens.access}`,
+                            'Content-Type': 'application/json'
+                        }
                     }
+                );
+                
+                // ✅ MEJORADO: Mostrar información COMPLETA con contraseña
+                if (response.data.success) {
+                    let mensaje = `✅ ${response.data.message}\n\n`;
+                    
+                    // ✅ AGREGAR INFORMACIÓN DETALLADA
+                    mensaje += `📋 INFORMACIÓN DEL SOCIO:\n`;
+                    mensaje += `────────────────────────────\n`;
+                    mensaje += `👤 Nombre: ${response.data.nombre_completo || 'No disponible'}\n`;
+                    mensaje += `📧 Email: ${response.data.email || 'No disponible'}\n`;
+                    mensaje += `🔑 Usuario: ${response.data.usuario || 'No disponible'}\n`;
+                    
+                    if (response.data.password) {
+                        mensaje += `🔒 Contraseña: ${response.data.password}\n`;
+                    }
+                    
+                    mensaje += `📅 Estado: ${response.data.estado || 'No disponible'}\n`;
+                    mensaje += `👥 Grupo SOCIO: ${response.data.grupo_socio ? '✅ Asignado' : '❌ No asignado'}\n`;
+                    mensaje += `✅ Usuario activo: ${response.data.usuario_activo ? 'SÍ' : 'NO (activar en Django Admin)'}\n\n`;
+                    
+                    // ✅ AGREGAR INSTRUCCIONES SI EL USUARIO ESTÁ INACTIVO
+                    if (!response.data.usuario_activo) {
+                        mensaje += `⚠️ IMPORTANTE - PASOS A SEGUIR:\n`;
+                        mensaje += `────────────────────────────────\n`;
+                        mensaje += `1. Ve a Django Admin → Usuarios\n`;
+                        mensaje += `2. Busca al usuario: ${response.data.usuario}\n`;
+                        mensaje += `3. Activa la casilla "Activo"\n`;
+                        mensaje += `4. Guarda los cambios\n`;
+                        mensaje += `5. Envía estas credenciales al socio:\n\n`;
+                        mensaje += `   📧 CREDENCIALES PARA ENVIAR:\n`;
+                        mensaje += `   -----------------------------\n`;
+                        mensaje += `   Usuario: ${response.data.usuario}\n`;
+                        mensaje += `   Contraseña: ${response.data.password}\n`;
+                    } else {
+                        mensaje += `✅ USUARIO ACTIVO - LISTO PARA USAR:\n`;
+                        mensaje += `────────────────────────────────────\n`;
+                        mensaje += `📧 Envía estas credenciales al socio:\n\n`;
+                        mensaje += `   🔑 CREDENCIALES:\n`;
+                        mensaje += `   --------------\n`;
+                        mensaje += `   Usuario: ${response.data.usuario}\n`;
+                        mensaje += `   Contraseña: ${response.data.password}\n\n`;
+                        mensaje += `   El socio puede iniciar sesión inmediatamente.\n`;
+                    }
+                    
+                    // ✅ Mostrar en alert con mejor formato
+                    alert(mensaje);
+                    
+                    // ✅ Guardar contraseña en localStorage para referencia
+                    if (response.data.password && response.data.usuario) {
+                        localStorage.setItem(`credenciales_${response.data.usuario}`, 
+                            JSON.stringify({
+                                usuario: response.data.usuario,
+                                password: response.data.password,
+                                email: response.data.email,
+                                fecha: new Date().toISOString()
+                            })
+                        );
+                    }
+                    
+                    // ✅ Actualizar la solicitud en el estado local
+                    setSolicitudesIngreso(prev => prev.map(solicitud => {
+                        if (solicitud.id === id) {
+                            return {
+                                ...solicitud,
+                                estado: 'APROBADO',
+                                usuario_creado: response.data.usuario,
+                                password_generada: response.data.password // ✅ Agregar contraseña
+                            };
+                        }
+                        return solicitud;
+                    }));
+                    
+                } else {
+                    alert(`⚠️ ${response.data.message || 'Error desconocido'}`);
                 }
-            );
+            } else {
+                // Para RECHAZADO, usar el endpoint normal
+                await axios.patch(
+                    `http://127.0.0.1:8000/api/admin/solicitudes/${id}/`, 
+                    { estado: nuevoEstado },
+                    { 
+                        headers: {
+                            'Authorization': `Bearer ${authTokens.access}`,
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+                alert(`✅ Solicitud ${nuevoEstado.toLowerCase()} correctamente.`);
+                
+                // Actualizar estado local
+                setSolicitudesIngreso(prev => prev.map(solicitud => {
+                    if (solicitud.id === id) {
+                        return { ...solicitud, estado: nuevoEstado };
+                    }
+                    return solicitud;
+                }));
+            }
             
-            cargarSolicitudesIngreso();
-            alert(`Solicitud ${nuevoEstado.toLowerCase()} correctamente.`);
         } catch (error) {
             console.error("Error actualizando estado", error);
-            alert("Hubo un error al actualizar el estado.");
+            
+            if (error.response?.status === 401) {
+                alert("Tu sesión ha expirado. Por favor, inicia sesión nuevamente.");
+                logoutUser();
+            } else if (error.response?.data?.error) {
+                alert(`❌ Error: ${error.response.data.error}`);
+            } else if (error.response?.data?.message) {
+                alert(`❌ Error: ${error.response.data.message}`);
+            } else {
+                alert("❌ Hubo un error al actualizar el estado. Verifica la consola para más detalles.");
+            }
         }
     };
 
@@ -247,13 +380,16 @@ function AdminView() {
         try {
             let authTokens = localStorage.getItem('authTokens') ? JSON.parse(localStorage.getItem('authTokens')) : null;
             await axios.delete(`http://127.0.0.1:8000/api/admin/solicitudes/${id}/`, { 
-                headers: { 'Authorization': `Bearer ${authTokens?.access}` }
+                headers: { 
+                    'Authorization': `Bearer ${authTokens?.access}`,
+                    'Content-Type': 'application/json'
+                }
             });
             cargarSolicitudesIngreso();
-            alert("Registro eliminado.");
+            alert("✅ Registro eliminado correctamente.");
         } catch (error) {
             console.error(error);
-            alert("Error al eliminar.");
+            alert("❌ Error al eliminar el registro.");
         }
     };
 
@@ -294,17 +430,17 @@ function AdminView() {
             if (editandoId) {
                 const anuncioActualizado = await updateAnuncio(editandoId, anuncioData);
                 setAnuncios(anuncios.map(a => a.id === editandoId ? anuncioActualizado : a));
-                alert("Anuncio actualizado correctamente");
+                alert("✅ Anuncio actualizado correctamente");
             } else {
                 const nuevoAnuncio = await createAnuncio(anuncioData);
                 setAnuncios([...anuncios, nuevoAnuncio]);
-                alert("Anuncio creado correctamente");
+                alert("✅ Anuncio creado correctamente");
             }
 
             cancelarForm();
         } catch (error) {
             console.error("Error al guardar:", error);
-            alert("Error al guardar el anuncio.");
+            alert("❌ Error al guardar el anuncio.");
         }
     };
 
@@ -314,6 +450,17 @@ function AdminView() {
             year: 'numeric',
             month: 'long',
             day: 'numeric'
+        });
+    };
+
+    const formatearFechaHora = (fechaString) => {
+        const fecha = new Date(fechaString);
+        return fecha.toLocaleDateString('es-ES', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
         });
     };
 
@@ -769,7 +916,7 @@ function AdminView() {
                                 {mensajesActuales.map((msg) => (
                                     <tr key={msg.id} className="hover:bg-gray-50 transition duration-150">
                                         <td className="px-3 py-2 border-b border-gray-200 bg-white whitespace-nowrap">
-                                            <div className="text-xs text-gray-500">{formatearFecha(msg.fecha)}</div>
+                                            <div className="text-xs text-gray-500">{formatearFechaHora(msg.fecha)}</div>
                                         </td>
                                         <td className="px-3 py-2 border-b border-gray-200 bg-white">
                                             <div className="font-medium truncate max-w-[120px]" title={msg.nombre}>
@@ -857,32 +1004,48 @@ function AdminView() {
                 <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4">
                     <h2 className="text-2xl font-bold text-gray-800">Solicitudes de Ingreso</h2>
                     
-                    <div className="flex bg-gray-100 p-1 rounded-lg mt-4 md:mt-0">
-                        <button
-                            onClick={() => { setTabActiva('PENDIENTES'); setPaginaSolicitudes(1); }}
-                            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                                tabActiva === 'PENDIENTES' 
-                                ? 'bg-white text-blue-600 shadow-sm' 
-                                : 'text-gray-500 hover:text-gray-700'
-                            }`}
-                        >
-                            Pendientes ({solicitudesIngreso.filter(s => s.estado === 'PENDIENTE').length})
-                        </button>
-                        <button
-                            onClick={() => { setTabActiva('HISTORIAL'); setPaginaSolicitudes(1); }}
-                            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                                tabActiva === 'HISTORIAL' 
-                                ? 'bg-white text-blue-600 shadow-sm' 
-                                : 'text-gray-500 hover:text-gray-700'
-                            }`}
-                        >
-                            Historial
-                        </button>
+                    <div className="flex flex-col md:flex-row items-center gap-4 mt-4 md:mt-0">
+                        <div className="flex bg-gray-100 p-1 rounded-lg">
+                            <button
+                                onClick={() => { setTabActiva('PENDIENTES'); setPaginaSolicitudes(1); }}
+                                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                                    tabActiva === 'PENDIENTES' 
+                                    ? 'bg-white text-blue-600 shadow-sm' 
+                                    : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                            >
+                                Pendientes ({solicitudesIngreso.filter(s => s.estado === 'PENDIENTE').length})
+                            </button>
+                            <button
+                                onClick={() => { setTabActiva('HISTORIAL'); setPaginaSolicitudes(1); }}
+                                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                                    tabActiva === 'HISTORIAL' 
+                                    ? 'bg-white text-blue-600 shadow-sm' 
+                                    : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                            >
+                                Historial ({solicitudesIngreso.filter(s => s.estado !== 'PENDIENTE').length})
+                            </button>
+                        </div>
+                        
+                        {cargandoSolicitudes && (
+                            <div className="text-sm text-blue-600">
+                                <span className="animate-pulse">Actualizando...</span>
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                {solicitudesFiltradas.length === 0 ? (
-                    <p className="text-gray-500 text-center py-8">No hay solicitudes en esta sección.</p>
+                {cargandoSolicitudes && solicitudesIngreso.length === 0 ? (
+                    <div className="text-center py-8">
+                        <p className="text-gray-500">Cargando solicitudes...</p>
+                    </div>
+                ) : solicitudesFiltradas.length === 0 ? (
+                    <p className="text-gray-500 text-center py-8">
+                        {tabActiva === 'PENDIENTES' 
+                            ? "No hay solicitudes pendientes." 
+                            : "No hay solicitudes en el historial."}
+                    </p>
                 ) : (
                     <>
                         <div className="overflow-x-auto">
@@ -893,14 +1056,15 @@ function AdminView() {
                                         <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase">Postulante</th>
                                         <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase">RUT</th>
                                         <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-center text-xs font-semibold text-gray-600 uppercase">Estado</th>
+                                        <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-center text-xs font-semibold text-gray-600 uppercase">Contraseña</th>
                                         <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-center text-xs font-semibold text-gray-600 uppercase">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {solicitudesVisibles.map((sol) => (
-                                        <tr key={sol.id}>
+                                        <tr key={sol.id} className="hover:bg-gray-50 transition duration-150">
                                             <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                                                {formatearFecha(sol.fecha_solicitud)}
+                                                {formatearFechaHora(sol.fecha_solicitud)}
                                             </td>
                                             <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
                                                 <div className="font-bold">{sol.nombre_completo}</div>
@@ -912,26 +1076,62 @@ function AdminView() {
                                             </td>
                                             <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm text-center">
                                                 <span className={`px-3 py-1 font-semibold text-xs rounded-full ${getBadgeColor(sol.estado)}`}>
-                                                    {sol.estado}
+                                                    {sol.estado === 'PENDIENTE' ? 'PENDIENTE' : sol.estado === 'APROBADO' ? 'APROBADO' : 'RECHAZADO'}
                                                 </span>
+                                                {sol.usuario_creado && (
+                                                    <div className="text-xs text-gray-500 mt-1">
+                                                        👤 {sol.usuario_creado}
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm text-center">
+                                                {sol.password_generada ? (
+                                                    <div className="flex flex-col items-center">
+                                                        <code className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs font-mono">
+                                                            {sol.password_generada}
+                                                        </code>
+                                                        <span className="text-xs text-gray-500 mt-1">
+                                                            Generada: {formatearFecha(sol.fecha_solicitud)}
+                                                        </span>
+                                                    </div>
+                                                ) : sol.estado === 'APROBADO' ? (
+                                                    <span className="text-xs text-gray-500 italic">
+                                                        Sin contraseña guardada
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs text-gray-500">—</span>
+                                                )}
                                             </td>
                                             <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm text-center">
                                                 {sol.estado === 'PENDIENTE' ? (
                                                     <div className="flex justify-center gap-2">
-                                                        <button onClick={() => handleEstadoSolicitud(sol.id, 'APROBADO')} className="bg-green-500 hover:bg-green-600 text-white p-2 rounded transition" title="Aprobar">
-                                                            ✅
+                                                        <button 
+                                                            onClick={() => handleEstadoSolicitud(sol.id, 'APROBADO')} 
+                                                            className="bg-green-500 hover:bg-green-600 text-white p-2 rounded transition flex items-center gap-1"
+                                                            title="Aprobar y crear usuario"
+                                                        >
+                                                            <span>✅</span>
+                                                            <span className="text-xs">Aprobar</span>
                                                         </button>
-                                                        <button onClick={() => handleEstadoSolicitud(sol.id, 'RECHAZADO')} className="bg-red-500 hover:bg-red-600 text-white p-2 rounded transition" title="Rechazar">
-                                                            ❌
+                                                        <button 
+                                                            onClick={() => handleEstadoSolicitud(sol.id, 'RECHAZADO')} 
+                                                            className="bg-red-500 hover:bg-red-600 text-white p-2 rounded transition flex items-center gap-1"
+                                                            title="Rechazar"
+                                                        >
+                                                            <span>❌</span>
+                                                            <span className="text-xs">Rechazar</span>
                                                         </button>
                                                     </div>
                                                 ) : (
-                                                    <button 
-                                                        onClick={() => handleEliminarSolicitud(sol.id)} 
-                                                        className="text-red-500 hover:text-red-700 text-xs font-bold border border-red-200 px-3 py-1 rounded hover:bg-red-50"
-                                                    >
-                                                        Eliminar Registro
-                                                    </button>
+                                                    <div className="flex justify-center gap-2">
+                                                        <button 
+                                                            onClick={() => handleEliminarSolicitud(sol.id)} 
+                                                            className="text-red-500 hover:text-red-700 text-xs font-bold border border-red-200 px-3 py-1 rounded hover:bg-red-50 transition"
+                                                            title="Eliminar registro"
+                                                        >
+                                                            Eliminar
+                                                        </button>
+                                                    </div>
                                                 )}
                                             </td>
                                         </tr>
@@ -945,7 +1145,7 @@ function AdminView() {
                                 <button 
                                     onClick={() => setPaginaSolicitudes(prev => Math.max(prev - 1, 1))}
                                     disabled={paginaSolicitudes === 1}
-                                    className="px-3 py-1 rounded bg-gray-200 text-gray-600 disabled:opacity-50 hover:bg-gray-300"
+                                    className="px-3 py-1 rounded bg-gray-200 text-gray-600 disabled:opacity-50 hover:bg-gray-300 transition"
                                 >
                                     Anterior
                                 </button>
@@ -955,7 +1155,7 @@ function AdminView() {
                                 <button 
                                     onClick={() => setPaginaSolicitudes(prev => Math.min(prev + 1, totalPaginasSol))}
                                     disabled={paginaSolicitudes === totalPaginasSol}
-                                    className="px-3 py-1 rounded bg-gray-200 text-gray-600 disabled:opacity-50 hover:bg-gray-300"
+                                    className="px-3 py-1 rounded bg-gray-200 text-gray-600 disabled:opacity-50 hover:bg-gray-300 transition"
                                 >
                                     Siguiente
                                 </button>
@@ -1002,6 +1202,9 @@ function AdminView() {
                                 </h1>
                                 <p className="text-base mt-2 text-white">
                                     ¡Bienvenido, <span className="font-semibold">{user?.username}!</span>
+                                </p>
+                                <p className="text-sm mt-1 text-gray-300">
+                                    Rol: {user?.is_admin ? 'Administrador' : user?.is_tesorero ? 'Tesorero' : user?.is_socio ? 'Socio' : 'Usuario'}
                                 </p>
                             </div>
                         </div>
@@ -1118,6 +1321,11 @@ function AdminView() {
                                 >
                                     <span>👥</span>
                                     <span>Solicitudes Ingreso</span>
+                                    {solicitudesIngreso.filter(s => s.estado === 'PENDIENTE').length > 0 && (
+                                        <span className="ml-auto bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                                            {solicitudesIngreso.filter(s => s.estado === 'PENDIENTE').length}
+                                        </span>
+                                    )}
                                 </button>
                                 
                                 <button 
@@ -1174,7 +1382,7 @@ function AdminView() {
                                 <div className="grid grid-cols-2 gap-4 text-sm border-b pb-4">
                                     <div>
                                         <p className="text-gray-500 font-semibold">Fecha:</p>
-                                        <p>{formatearFecha(mensajeSeleccionado.fecha)}</p>
+                                        <p>{formatearFechaHora(mensajeSeleccionado.fecha)}</p>
                                     </div>
                                     <div>
                                         <p className="text-gray-500 font-semibold">Remitente:</p>

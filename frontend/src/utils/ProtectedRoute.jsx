@@ -12,15 +12,29 @@ const ProtectedRoute = ({ children, role }) => {
 
     // 2. Comprueba el rol de admin
     if (role === 'admin' && !user.is_admin) {
-        return <Navigate to="/" />; // No es admin, a la home
+        // Redirige según el rol real del usuario
+        if (user.is_tesorero) return <Navigate to="/tesorero" />;
+        if (user.is_socio) return <Navigate to="/socio" />;
+        return <Navigate to="/" />;
     }
 
     // 3. Comprueba el rol de tesorero
     if (role === 'tesorero' && !user.is_tesorero) {
-        return <Navigate to="/" />; // No es tesorero, a la home
+        // Redirige según el rol real del usuario
+        if (user.is_admin) return <Navigate to="/admin" />;
+        if (user.is_socio) return <Navigate to="/socio" />;
+        return <Navigate to="/" />;
     }
 
-    // 4. Si todo está bien, muestra la página solicitada
+    // 4. NUEVO: Comprueba el rol de socio
+    if (role === 'socio' && !user.is_socio) {
+        // Redirige según el rol real del usuario
+        if (user.is_admin) return <Navigate to="/admin" />;
+        if (user.is_tesorero) return <Navigate to="/tesorero" />;
+        return <Navigate to="/" />;
+    }
+
+    // 5. Si todo está bien, muestra la página solicitada
     return children;
 };
 

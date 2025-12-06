@@ -2,22 +2,24 @@ from django.shortcuts import render
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers import MyTokenObtainPairSerializer
 from rest_framework import viewsets, permissions, status, generics
-from rest_framework.decorators import action, api_view 
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny, IsAdminUser
+from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from django.db.models import Q
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt 
 from django.utils import timezone 
+from django.utils.crypto import get_random_string
 import json
 import decimal
 import traceback
 import django.db.utils
 from django.db import transaction
+from django.contrib.auth.models import User, Group
 
 # --- Dependencias ---
-from .models import Anuncio, LibroCuenta, Mensaje, Contacto, Donacion, SolicitudIngreso,EventoCalendario
-from .serializers import AnuncioSerializer, LibroCuentaSerializer, MensajeSerializer, ContactoSerializer, DonacionSerializer , SolicitudIngresoSerializer,EventoCalendarioSerializer
+from .models import Anuncio, LibroCuenta, Mensaje, Contacto, Donacion, SolicitudIngreso, EventoCalendario
+from .serializers import AnuncioSerializer, LibroCuentaSerializer, MensajeSerializer, ContactoSerializer, DonacionSerializer, SolicitudIngresoSerializer, EventoCalendarioSerializer
 
 # --- SDK de Mercado Pago (Python) ---
 import mercadopago
@@ -34,6 +36,21 @@ client = mercadopago.SDK(CLIENT_ACCESS_TOKEN)
 
 class MyTokenObtainPairView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer
+    
+    def post(self, request, *args, **kwargs):
+        # Verificar si el usuario existe y está inactivo
+        username = request.data.get('username')
+        if username:
+            try:
+                user = User.objects.get(username=username)
+                if not user.is_active:
+                    return Response({
+                        'detail': 'Usuario inactivo. Contacta al administrador para activar tu cuenta.'
+                    }, status=status.HTTP_403_FORBIDDEN)
+            except User.DoesNotExist:
+                pass  # Continuar con el flujo normal de JWT
+        
+        return super().post(request, *args, **kwargs)
     
 class IsTesoreroOrAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
@@ -89,6 +106,162 @@ class EventoCalendarioViewSet(viewsets.ModelViewSet):
     queryset = EventoCalendario.objects.all()
     serializer_class = EventoCalendarioSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+
+# -----------------------------------------------------------------------------------
+# VISTA ESPECIAL PARA APROBAR Y CREAR USUARIO AUTOMÁTICO (PARA REACT)
+# -----------------------------------------------------------------------------------
+
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def aprobar_solicitud_con_usuario(request, solicitud_id):
+    """
+    Vista especial para React que:
+    1. Aprueba la solicitud
+    2. Crea usuario automático ACTIVO
+    3. Asigna al grupo SOCIO
+    """
+    try:
+        solicitud = SolicitudIngreso.objects.get(id=solicitud_id)
+        
+        # Verificar que no esté ya aprobada
+        if solicitud.estado == 'APROBADO':
+            return Response({
+                'success': True,
+                'message': 'La solicitud ya estaba aprobada',
+                'estado': 'APROBADO'
+            })
+        
+        # 1. Cambiar estado a APROBADO
+        solicitud.estado = 'APROBADO'
+        
+        # 2. Crear usuario si no existe
+        usuario_creado = None
+        password_generada = None
+        
+        if not solicitud.usuario_creado:
+            try:
+                # Crear username del RUT
+                username = solicitud.rut_dni.lower().replace('.', '').replace('-', '')
+                counter = 1
+                original_username = username
+                
+                # Verificar si ya existe usuario con ese email
+                if User.objects.filter(email=solicitud.email).exists():
+                    usuario_existente = User.objects.get(email=solicitud.email)
+                    solicitud.usuario_creado = usuario_existente
+                    usuario_creado = usuario_existente
+                    
+                    # ACTIVAR usuario si está inactivo
+                    if not usuario_existente.is_active:
+                        usuario_existente.is_active = True
+                        usuario_existente.save()
+                        solicitud.usuario_activo = True
+                    
+                    # Verificar si está en grupo SOCIO
+                    en_grupo_socio = usuario_existente.groups.filter(name='SOCIO').exists()
+                    if not en_grupo_socio:
+                        grupo_socio, _ = Group.objects.get_or_create(name='SOCIO')
+                        usuario_existente.groups.add(grupo_socio)
+                        usuario_existente.save()
+                    
+                    solicitud.save()
+                    
+                    return Response({
+                        'success': True,
+                        'message': f'Usuario ya existía: {usuario_existente.username} - Activado y asignado a grupo SOCIO',
+                        'estado': 'APROBADO',
+                        'usuario': usuario_existente.username,
+                        'grupo_socio': True,
+                        'usuario_activo': True
+                    })
+                
+                # Generar username único
+                while User.objects.filter(username=username).exists():
+                    username = f"{original_username}{counter}"
+                    counter += 1
+                
+                # Dividir nombre
+                nombres = solicitud.nombre_completo.split()
+                first_name = nombres[0] if nombres else ''
+                last_name = ' '.join(nombres[1:]) if len(nombres) > 1 else ''
+                
+                # ✅ Crear usuario ACTIVO con contraseña aleatoria
+                password_generada = get_random_string(12)
+                user = User.objects.create_user(
+                    username=username,
+                    email=solicitud.email,
+                    password=password_generada,
+                    first_name=first_name,
+                    last_name=last_name,
+                    is_active=True,  # ✅ USUARIO ACTIVO AUTOMÁTICAMENTE
+                    is_staff=False,
+                    is_superuser=False
+                )
+                
+                # Asignar al grupo SOCIO
+                grupo_socio, _ = Group.objects.get_or_create(name='SOCIO')
+                user.groups.add(grupo_socio)
+                user.save()  # Guardar explícitamente
+                
+                # Guardar referencia en la solicitud
+                solicitud.usuario_creado = user
+                solicitud.usuario_activo = True  # ✅ Marcar como activo
+                usuario_creado = user
+                
+                # Verificar asignación
+                en_grupo_socio = user.groups.filter(name='SOCIO').exists()
+                print(f"DEBUG: Usuario {username} en grupo SOCIO: {en_grupo_socio}")
+                
+            except Exception as e:
+                return Response({
+                    'success': False,
+                    'message': f'Solicitud aprobada pero error creando usuario: {str(e)}',
+                    'estado': 'APROBADO'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            # Si ya tenía usuario, verificar si está activo
+            usuario_creado = solicitud.usuario_creado
+            en_grupo_socio = usuario_creado.groups.filter(name='SOCIO').exists()
+            
+            # ✅ ACTIVAR si está inactivo
+            if not usuario_creado.is_active:
+                usuario_creado.is_active = True
+                solicitud.usuario_activo = True
+            
+            if not en_grupo_socio:
+                grupo_socio, _ = Group.objects.get_or_create(name='SOCIO')
+                usuario_creado.groups.add(grupo_socio)
+            
+            usuario_creado.save()
+        
+        # Guardar la solicitud
+        solicitud.save()
+        
+        # Preparar respuesta
+        response_data = {
+            'success': True,
+            'message': f'Solicitud de {solicitud.nombre_completo} aprobada correctamente',
+            'estado': 'APROBADO',
+            'usuario': usuario_creado.username if usuario_creado else None,
+            'grupo_socio': True,
+            'usuario_activo': usuario_creado.is_active if usuario_creado else False,
+        }
+        
+        if password_generada:
+            response_data['password'] = password_generada
+            response_data['nota'] = '✅ Usuario ACTIVO - Listo para iniciar sesión.'
+        
+        return Response(response_data)
+        
+    except SolicitudIngreso.DoesNotExist:
+        return Response({
+            'error': 'Solicitud no encontrada'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({
+            'error': f'Error interno: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # -----------------------------------------------------------------------------------
@@ -174,7 +347,7 @@ def crear_preferencia(request):
 
         return Response({'error': error_message}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-#
+
 @api_view(['POST']) 
 @csrf_exempt 
 @transaction.atomic

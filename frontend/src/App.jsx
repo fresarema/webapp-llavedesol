@@ -7,6 +7,7 @@ import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import AdminView from './pages/AdminView';
 import TesoreroView from './pages/TesoreroView';
+import SocioView from './pages/SocioView'; // ← NUEVO IMPORT
 import ProtectedRoute from './utils/ProtectedRoute';
 import Donaciones from './components/Donaciones/mercado-pago';
 import FormularioAdmision from './components/FormularioAdmision/FormularioAdmision';
@@ -37,6 +38,15 @@ function App() {
           element={
             <ProtectedRoute role="tesorero">
               <TesoreroView />
+            </ProtectedRoute>
+          } 
+        />
+        {/* NUEVA RUTA PARA SOCIOS */}
+        <Route 
+          path="/socio" 
+          element={
+            <ProtectedRoute role="socio">
+              <SocioView />
             </ProtectedRoute>
           } 
         />

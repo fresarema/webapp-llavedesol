@@ -5,23 +5,19 @@ import axios from 'axios';
 
 const AuthContext = createContext();
 
-// Hook personalizado para usar el contexto fácilmente
 export const useAuth = () => {
     return useContext(AuthContext);
 };
 
-// URL de tu API de Django
 const API_URL = 'http://127.0.0.1:8000/api';
 
 export const AuthProvider = ({ children }) => {
-    // Intentamos leer el token de localStorage al iniciar
     const [authTokens, setAuthTokens] = useState(() => 
         localStorage.getItem('authTokens')
             ? JSON.parse(localStorage.getItem('authTokens'))
             : null
     );
     
-    // El usuario se decodifica del token
     const [user, setUser] = useState(() => 
         localStorage.getItem('authTokens')
             ? jwtDecode(JSON.parse(localStorage.getItem('authTokens')).access)
@@ -30,10 +26,9 @@ export const AuthProvider = ({ children }) => {
 
     const navigate = useNavigate();
 
-    // Función de Login
+    // Función de Login - VERSIÓN MEJORADA (MANTIENE TODO LO QUE FUNCIONA)
     const loginUser = async (username, password) => {
         try {
-            // 1. Llama a la API de Django (Paso 6 del backend)
             const response = await axios.post(`${API_URL}/token/`, {
                 username: username,
                 password: password,
@@ -43,43 +38,75 @@ export const AuthProvider = ({ children }) => {
                 const data = response.data;
                 setAuthTokens(data);
                 
-                // 2. Decodifica el token para obtener los roles (Paso 4 del backend)
                 const decodedUser = jwtDecode(data.access);
                 setUser(decodedUser);
                 
-                // 3. Guarda en localStorage para persistir la sesión
                 localStorage.setItem('authTokens', JSON.stringify(data));
 
-                // 4. Redirige según el rol
+                // ✅ MANTENIENDO LA LÓGICA ORIGINAL DE REDIRECCIÓN
                 if (decodedUser.is_admin) {
                     navigate('/admin');
                 } else if (decodedUser.is_tesorero) {
                     navigate('/tesorero');
+                } else if (decodedUser.is_socio) {
+                    navigate('/socio');
                 } else {
-                    navigate('/'); // Si no tiene rol, a la home
+                    navigate('/');
                 }
             }
         } catch (error) {
             console.error("Error en el login:", error);
-            alert("Usuario o contraseña incorrectos");
+            
+            // ✅ MEJOR FEEDBACK (SOLO AGREGANDO ESTO)
+            if (error.response) {
+                if (error.response.status === 401) {
+                    const errorMsg = error.response.data?.detail || "";
+                    
+                    // Detectar si es usuario inactivo
+                    if (errorMsg.toLowerCase().includes('inactivo') || 
+                        errorMsg.toLowerCase().includes('active') ||
+                        errorMsg.toLowerCase().includes('no active')) {
+                        alert("⚠️ Usuario inactivo. Contacta al administrador para activar tu cuenta.");
+                    } else {
+                        alert("Usuario o contraseña incorrectos");
+                    }
+                } else if (error.response.status === 400) {
+                    alert("Datos inválidos. Verifica usuario y contraseña.");
+                } else {
+                    alert(`Error del servidor (${error.response.status})`);
+                }
+            } else if (error.request) {
+                alert("No hay respuesta del servidor. Verifica tu conexión.");
+            } else {
+                alert("Error de conexión. Intenta nuevamente.");
+            }
         }
     };
 
-    // Función de Logout
+    // Función de Logout - SIN CAMBIOS
     const logoutUser = () => {
         navigate('/');
         setAuthTokens(null);
         setUser(null);
         localStorage.removeItem('authTokens');
-        
     };
 
-    // Los datos que compartiremos con toda la app
+    // Función para obtener tipo de usuario - SIN CAMBIOS
+    const getUserType = () => {
+        if (!user) return null;
+        if (user.is_admin) return 'admin';
+        if (user.is_tesorero) return 'tesorero';
+        if (user.is_socio) return 'socio';
+        return null;
+    };
+
     const contextData = {
         user: user,
+        userType: getUserType(),
         authTokens: authTokens,
         loginUser: loginUser,
         logoutUser: logoutUser,
+        getUserType: getUserType,
     };
 
     return (
