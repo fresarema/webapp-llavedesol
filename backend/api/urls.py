@@ -12,7 +12,8 @@ from .views import (
     ListarSolicitudesView,
     ActualizarSolicitudView,
     EventoCalendarioViewSet,
-    aprobar_solicitud_con_usuario  # <-- NUEVA IMPORTACIÓN
+    aprobar_solicitud_con_usuario,
+    cambiar_password  # <-- IMPORTAR LA NUEVA VISTA
 )
 
 router = DefaultRouter()
@@ -34,10 +35,13 @@ urlpatterns = [
     path('admin/solicitudes/', ListarSolicitudesView.as_view(), name='listar_solicitudes'),
     path('admin/solicitudes/<int:pk>/', ActualizarSolicitudView.as_view(), name='actualizar_solicitud'),
     
-    # NUEVA RUTA: Aprobar y crear usuario automático
+    # Aprobar y crear usuario automático
     path('admin/solicitudes/<int:solicitud_id>/aprobar-con-usuario/', 
          aprobar_solicitud_con_usuario, 
          name='aprobar_solicitud_con_usuario'),
+    
+    # NUEVA RUTA: Cambiar contraseña
+    path('cambiar-password/', cambiar_password, name='cambiar_password'),
     
     # --------------------------------------------------------
     # RUTAS PARA MERCADO PAGO

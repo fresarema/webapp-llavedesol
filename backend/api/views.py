@@ -16,6 +16,7 @@ import traceback
 import django.db.utils
 from django.db import transaction
 from django.contrib.auth.models import User, Group
+from django.contrib.auth import update_session_auth_hash
 
 # --- Dependencias ---
 from .models import Anuncio, LibroCuenta, Mensaje, Contacto, Donacion, SolicitudIngreso, EventoCalendario
@@ -261,6 +262,76 @@ def aprobar_solicitud_con_usuario(request, solicitud_id):
     except Exception as e:
         return Response({
             'error': f'Error interno: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# -----------------------------------------------------------------------------------
+# VISTA PARA CAMBIAR CONTRASEÑA (PARA SOCIOS)
+# -----------------------------------------------------------------------------------
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def cambiar_password(request):
+    """
+    Permite al usuario cambiar su propia contraseña
+    """
+    try:
+        user = request.user
+        
+        # Obtener datos del request
+        password_actual = request.data.get('password_actual')
+        nueva_password = request.data.get('nueva_password')
+        confirmar_password = request.data.get('confirmar_password')
+        
+        # Validaciones
+        if not password_actual or not nueva_password or not confirmar_password:
+            return Response({
+                'success': False,
+                'message': 'Todos los campos son requeridos'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        if nueva_password != confirmar_password:
+            return Response({
+                'success': False,
+                'message': 'Las contraseñas nuevas no coinciden'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        if len(nueva_password) < 8:
+            return Response({
+                'success': False,
+                'message': 'La nueva contraseña debe tener al menos 8 caracteres'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Verificar contraseña actual
+        if not user.check_password(password_actual):
+            return Response({
+                'success': False,
+                'message': 'La contraseña actual es incorrecta'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Verificar que no sea la misma contraseña
+        if user.check_password(nueva_password):
+            return Response({
+                'success': False,
+                'message': 'La nueva contraseña no puede ser igual a la actual'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Cambiar contraseña
+        user.set_password(nueva_password)
+        user.save()
+        
+        # Mantener la sesión activa después de cambiar la contraseña
+        update_session_auth_hash(request, user)
+        
+        return Response({
+            'success': True,
+            'message': '✅ Contraseña cambiada exitosamente'
+        })
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
