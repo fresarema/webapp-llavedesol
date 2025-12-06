@@ -16,8 +16,8 @@ import django.db.utils
 from django.db import transaction
 
 # --- Dependencias ---
-from .models import Anuncio, LibroCuenta, Mensaje, Contacto, Donacion, SolicitudIngreso
-from .serializers import AnuncioSerializer, LibroCuentaSerializer, MensajeSerializer, ContactoSerializer, DonacionSerializer , SolicitudIngresoSerializer
+from .models import Anuncio, LibroCuenta, Mensaje, Contacto, Donacion, SolicitudIngreso,EventoCalendario
+from .serializers import AnuncioSerializer, LibroCuentaSerializer, MensajeSerializer, ContactoSerializer, DonacionSerializer , SolicitudIngresoSerializer,EventoCalendarioSerializer
 
 # --- SDK de Mercado Pago (Python) ---
 import mercadopago
@@ -84,6 +84,11 @@ class MensajeViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(emisor_tipo=emisor_tipo)
             
         return queryset
+
+class EventoCalendarioViewSet(viewsets.ModelViewSet):
+    queryset = EventoCalendario.objects.all()
+    serializer_class = EventoCalendarioSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
 
 # -----------------------------------------------------------------------------------

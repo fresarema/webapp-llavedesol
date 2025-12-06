@@ -12,7 +12,8 @@ from .views import (
     webhook_mp,
     CrearSolicitudView,
     ListarSolicitudesView,
-    ActualizarSolicitudView
+    ActualizarSolicitudView,
+     EventoCalendarioViewSet
 )
 
 router = DefaultRouter()
@@ -20,6 +21,7 @@ router.register(r'anuncios', AnuncioViewSet, basename='anuncios')
 router.register(r'libros-cuentas', LibroCuentaViewSet, basename='librocuenta')
 router.register(r'mensajes', MensajeViewSet, basename='mensajes')
 router.register(r'contacto', ContactoViewSet)
+router.register(r'eventos-calendario', EventoCalendarioViewSet)
 
 urlpatterns = [
 

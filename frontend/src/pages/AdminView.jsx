@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { getAnuncios, createAnuncio, deleteAnuncio, updateAnuncio } from "../services/anunciosService";
 import { getLibrosCuentas, deleteLibroCuenta } from "../services/TesoreroService";
 import MensajesPanel from "../components/MensajesPanel/MensajesPanel"; 
+import Calendario from "../components/Calendario/Calendario"; 
 import Fondo from "../assets/fondo.png";
 import Logo from "../assets/Logo.png";
 
@@ -12,9 +13,11 @@ function AdminView() {
 
     const [anuncios, setAnuncios] = useState([]);
     const [librosCuentas, setLibrosCuentas] = useState([]);
-    // Estado para mensajes de contacto
     const [mensajesContacto, setMensajesContacto] = useState([]);
+    const [eventosCalendario, setEventosCalendario] = useState([]);
     const [solicitudesIngreso, setSolicitudesIngreso] = useState([]);
+    const [cargandoCalendario, setCargandoCalendario] = useState(true);
+
     const [titulo, setTitulo] = useState("");
     const [descripcion, setDescripcion] = useState("");
     const [imagen, setImagen] = useState("");
@@ -22,23 +25,29 @@ function AdminView() {
     const [editandoId, setEditandoId] = useState(null);
     const [loadingLibros, setLoadingLibros] = useState(true);
 
-    // Estado para el modal de ver mensaje completo
     const [mensajeSeleccionado, setMensajeSeleccionado] = useState(null);
-
-    // --- ESTADOS PARA PAGINACION DE MENSAJES ---
     const [paginaActual, setPaginaActual] = useState(1);
     const mensajesPorPagina = 10;
-    // --- ESTADOS PARA PAGINACION DE SOLICITUDES DE ADMISION ---
+    
+    // NUEVO: Estado para la sección activa
+    const [seccionActiva, setSeccionActiva] = useState('anuncios');
+    
+    // NUEVOS ESTADOS PARA FILTROS
+    const [filtroBusqueda, setFiltroBusqueda] = useState('');
+    const [filtroFecha, setFiltroFecha] = useState('');
+    const [filtroOrden, setFiltroOrden] = useState('recientes');
+
+    // ESTADOS PARA SOLICITUDES DE INGRESO (del primer código)
     const [paginaSolicitudes, setPaginaSolicitudes] = useState(1);
     const solicitudesPorPagina = 5; 
     const [tabActiva, setTabActiva] = useState('PENDIENTES'); 
 
-
     useEffect(() => {
       cargarAnuncios();
       cargarLibrosCuentas();
-      cargarMensajesContacto(); 
-      cargarSolicitudesIngreso();
+      cargarMensajesContacto();
+      cargarEventosCalendario();
+      cargarSolicitudesIngreso(); // Nueva función del primer código
     }, []);
 
     const cargarAnuncios = async () => {
@@ -57,7 +66,6 @@ function AdminView() {
       }
     };
 
-    // Funcion para cargar los mensajes de contacto
     const cargarMensajesContacto = async () => {
         try {
             const response = await axios.get('http://127.0.0.1:8000/api/contacto/');
@@ -66,8 +74,105 @@ function AdminView() {
             console.error("Error cargando mensajes de contacto", error);
         }
     };
+    
+    const cargarEventosCalendario = async () => {
+        try {
+            const authTokens = JSON.parse(localStorage.getItem('authTokens'));
+            const token = authTokens?.access;
+            
+            console.log('Token obtenido:', token ? 'Sí' : 'No');
+            
+            const response = await axios.get('http://127.0.0.1:8000/api/eventos-calendario/', {
+                headers: { 
+                    Authorization: `Bearer ${token}` 
+                }
+            });
+            setEventosCalendario(response.data);
+        } catch (error) {
+            console.error("Error cargando eventos:", error.response?.data || error.message);
+        } finally {
+            setCargandoCalendario(false);
+        }
+    };
 
-    // Funcion para eliminar mensajes
+    // NUEVA: FUNCIÓN PARA CARGAR SOLICITUDES DE INGRESO (del primer código)
+    const cargarSolicitudesIngreso = async () => {
+        try {
+            let authTokens = localStorage.getItem('authTokens') ? JSON.parse(localStorage.getItem('authTokens')) : null;
+            
+            if (!authTokens) {
+                console.error("No hay token de acceso. ¿Estás logueado?");
+                return;
+            }
+
+            const response = await axios.get('http://127.0.0.1:8000/api/admin/solicitudes/', {
+                headers: {
+                    'Authorization': `Bearer ${authTokens.access}`
+                }
+            });
+            
+            setSolicitudesIngreso(response.data);
+        } catch (error) {
+            console.error("Error cargando solicitudes de ingreso", error);
+        }
+    };
+
+    const guardarEventoCalendario = async (eventoData) => {
+        try {
+            const authTokens = JSON.parse(localStorage.getItem('authTokens'));
+            const token = authTokens?.access;
+            
+            if (!token) {
+                console.error('No hay token disponible');
+                throw new Error('No autenticado');
+            }
+            
+            if (eventoData.id) {
+                await axios.put(
+                    `http://127.0.0.1:8000/api/eventos-calendario/${eventoData.id}/`,
+                    eventoData,
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+            } else {
+                await axios.post(
+                    'http://127.0.0.1:8000/api/eventos-calendario/',
+                    eventoData,
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+            }
+            
+            cargarEventosCalendario();
+            return true;
+        } catch (error) {
+            console.error("Error guardando evento:", error.response?.data || error.message);
+            throw error;
+        }
+    };
+
+    const eliminarEventoCalendario = async (id) => {
+        try {
+            const authTokens = JSON.parse(localStorage.getItem('authTokens'));
+            const token = authTokens?.access;
+            
+            if (!token) {
+                console.error('No hay token disponible');
+                throw new Error('No autenticado');
+            }
+            
+            await axios.delete(
+                `http://127.0.0.1:8000/api/eventos-calendario/${id}/`,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            
+            cargarEventosCalendario();
+            return true;
+        } catch (error) {
+            console.error("Error eliminando evento:", error.response?.data || error.message);
+            throw error;
+        }
+    };
+
+    // NUEVA: FUNCIÓN PARA ELIMINAR MENSAJES DE CONTACTO (del primer código)
     const handleEliminarMensaje = async (id) => {
         if (window.confirm("¿Estás seguro de borrar este mensaje?")) {
             try {
@@ -109,6 +214,55 @@ function AdminView() {
                 console.error("Error al eliminar libro:", error);
                 alert("Error al eliminar el libro de cuentas.");
             }
+        }
+    };
+
+    // NUEVAS: FUNCIONES PARA SOLICITUDES DE INGRESO (del primer código)
+    const handleEstadoSolicitud = async (id, nuevoEstado) => {
+        try {
+            let authTokens = localStorage.getItem('authTokens') ? JSON.parse(localStorage.getItem('authTokens')) : null;
+
+            await axios.patch(`http://127.0.0.1:8000/api/admin/solicitudes/${id}/`, 
+                { estado: nuevoEstado }, // Datos
+                { 
+                    headers: {
+                        'Authorization': `Bearer ${authTokens?.access}`
+                    }
+                }
+            );
+            
+            cargarSolicitudesIngreso();
+            alert(`Solicitud ${nuevoEstado.toLowerCase()} correctamente.`);
+        } catch (error) {
+            console.error("Error actualizando estado", error);
+            alert("Hubo un error al actualizar el estado.");
+        }
+    };
+
+    const handleEliminarSolicitud = async (id) => {
+        if (!window.confirm("¿Estás seguro? Al borrarlo, el RUT quedará liberado para postular nuevamente.")) {
+            return;
+        }
+
+        try {
+            let authTokens = localStorage.getItem('authTokens') ? JSON.parse(localStorage.getItem('authTokens')) : null;
+            await axios.delete(`http://127.0.0.1:8000/api/admin/solicitudes/${id}/`, { 
+                headers: { 'Authorization': `Bearer ${authTokens?.access}` }
+            });
+            cargarSolicitudesIngreso(); // Recargar lista
+            alert("Registro eliminado.");
+        } catch (error) {
+            console.error(error);
+            alert("Error al eliminar.");
+        }
+    };
+
+    // NUEVA: Ayuda visual para los colores de las etiquetas de estado (del primer código)
+    const getBadgeColor = (estado) => {
+        switch(estado) {
+            case 'APROBADO': return 'bg-green-100 text-green-800 border-green-200';
+            case 'RECHAZADO': return 'bg-red-100 text-red-800 border-red-200';
+            default: return 'bg-yellow-100 text-yellow-800 border-yellow-200';
         }
     };
 
@@ -172,85 +326,6 @@ function AdminView() {
         return `http://127.0.0.1:8000${archivoPath}`;
     };
 
-    // LOGICA DE SOLICITUDES DE INGRESO
-    const cargarSolicitudesIngreso = async () => {
-        try {
-            // Busca token JWT
-            let authTokens = localStorage.getItem('authTokens') ? JSON.parse(localStorage.getItem('authTokens')) : null;
-            
-            if (!authTokens) {
-                console.error("No hay token de acceso. ¿Estás logueado?");
-                return;
-            }
-
-            const response = await axios.get('http://127.0.0.1:8000/api/admin/solicitudes/', {
-                headers: {
-                    'Authorization': `Bearer ${authTokens.access}`
-                }
-            });
-            
-            setSolicitudesIngreso(response.data);
-        } catch (error) {
-            console.error("Error cargando solicitudes de ingreso", error);
-
-        }
-    };
-
-    // Funcion para Aprobar o Rechazar
-    const handleEstadoSolicitud = async (id, nuevoEstado) => {
-        try {
-            let authTokens = localStorage.getItem('authTokens') ? JSON.parse(localStorage.getItem('authTokens')) : null;
-
-            await axios.patch(`http://127.0.0.1:8000/api/admin/solicitudes/${id}/`, 
-                { estado: nuevoEstado }, // Datos
-                { 
-                    headers: {
-                        'Authorization': `Bearer ${authTokens?.access}`
-                    }
-                }
-            );
-            
-            cargarSolicitudesIngreso();
-            alert(`Solicitud ${nuevoEstado.toLowerCase()} correctamente.`);
-        } catch (error) {
-            console.error("Error actualizando estado", error);
-            alert("Hubo un error al actualizar el estado.");
-        }
-    };
-
-    // Funcion para borrar y darle ooootra oportunidad! Otra oportunidaaad!
-    const handleEliminarSolicitud = async (id) => {
-        if (!window.confirm("¿Estás seguro? Al borrarlo, el RUT quedará liberado para postular nuevamente.")) {
-            return;
-        }
-
-        try {
-            let authTokens = localStorage.getItem('authTokens') ? JSON.parse(localStorage.getItem('authTokens')) : null;
-            await axios.delete(`http://127.0.0.1:8000/api/admin/solicitudes/${id}/`, { 
-                headers: { 'Authorization': `Bearer ${authTokens?.access}` }
-            });
-            cargarSolicitudesIngreso(); // Recargar lista
-            alert("Registro eliminado.");
-        } catch (error) {
-            console.error(error);
-            alert("Error al eliminar.");
-        }
-    };
-
-    // Ayuda visual para los colores de las etiquetas de estado
-    const getBadgeColor = (estado) => {
-        switch(estado) {
-            case 'APROBADO': return 'bg-green-100 text-green-800 border-green-200';
-            case 'RECHAZADO': return 'bg-red-100 text-red-800 border-red-200';
-            default: return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-        }
-    };
-
-
-
-
-
-    // Funciones para el Modal de Mensaje
     const abrirModalMensaje = (mensaje) => {
         setMensajeSeleccionado(mensaje);
     };
@@ -259,11 +334,55 @@ function AdminView() {
         setMensajeSeleccionado(null);
     };
 
-    // --- LOGICA DE PAGINACION ---
+    // NUEVA FUNCIÓN: Filtrar mensajes
+    const filtrarMensajes = () => {
+        let mensajesFiltrados = [...mensajesContacto];
+        
+        // Filtrar por búsqueda (nombre o correo)
+        if (filtroBusqueda) {
+            const busqueda = filtroBusqueda.toLowerCase();
+            mensajesFiltrados = mensajesFiltrados.filter(msg => 
+                msg.nombre.toLowerCase().includes(busqueda) || 
+                msg.correo.toLowerCase().includes(busqueda) ||
+                msg.mensaje.toLowerCase().includes(busqueda)
+            );
+        }
+        
+        // Filtrar por fecha
+        if (filtroFecha) {
+            const fechaSeleccionada = new Date(filtroFecha).toDateString();
+            mensajesFiltrados = mensajesFiltrados.filter(msg => {
+                const fechaMsg = new Date(msg.fecha).toDateString();
+                return fechaMsg === fechaSeleccionada;
+            });
+        }
+        
+        // Ordenar
+        if (filtroOrden === 'recientes') {
+            mensajesFiltrados.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+        } else if (filtroOrden === 'antiguos') {
+            mensajesFiltrados.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+        } else if (filtroOrden === 'nombre') {
+            mensajesFiltrados.sort((a, b) => a.nombre.localeCompare(b.nombre));
+        }
+        
+        return mensajesFiltrados;
+    };
+
+    // NUEVA FUNCIÓN: Limpiar filtros
+    const limpiarFiltros = () => {
+        setFiltroBusqueda('');
+        setFiltroFecha('');
+        setFiltroOrden('recientes');
+        setPaginaActual(1);
+    };
+
+    // Usar mensajes filtrados
+    const mensajesFiltrados = filtrarMensajes();
     const indiceUltimoMensaje = paginaActual * mensajesPorPagina;
     const indicePrimerMensaje = indiceUltimoMensaje - mensajesPorPagina;
-    const mensajesActuales = mensajesContacto.slice(indicePrimerMensaje, indiceUltimoMensaje);
-    const totalPaginas = Math.ceil(mensajesContacto.length / mensajesPorPagina);
+    const mensajesActuales = mensajesFiltrados.slice(indicePrimerMensaje, indiceUltimoMensaje);
+    const totalPaginas = Math.ceil(mensajesFiltrados.length / mensajesPorPagina);
 
     const irPaginaSiguiente = () => {
         if (paginaActual < totalPaginas) setPaginaActual(paginaActual + 1);
@@ -273,20 +392,623 @@ function AdminView() {
         if (paginaActual > 1) setPaginaActual(paginaActual - 1);
     };
 
+    // FUNCIÓN PARA RENDERIZAR LA SECCIÓN ACTIVA
+    const renderSeccionActiva = () => {
+        switch(seccionActiva) {
+            case 'anuncios':
+                return renderAnuncios();
+            case 'libros':
+                return renderLibros();
+            case 'calendario':
+                return renderCalendario();
+            case 'contacto':
+                return renderContacto();
+            case 'solicitudes': // NUEVA SECCIÓN
+                return renderSolicitudes();
+            default:
+                return renderAnuncios();
+        }
+    };
+
+    // FUNCIONES DE RENDERIZADO PARA CADA SECCIÓN
+    const renderAnuncios = () => (
+        <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold">Anuncios actuales</h2>
+                {!mostrarForm && (
+                    <button
+                        onClick={() => setMostrarForm(true)}
+                        className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg font-medium transition duration-300"
+                    >
+                        + Crear Nuevo Anuncio
+                    </button>
+                )}
+            </div>
+
+            {anuncios.length === 0 ? (
+                <div className="p-8 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 text-center">
+                    <p className="text-lg">No hay anuncios creados aún.</p>
+                    <button
+                        onClick={() => setMostrarForm(true)}
+                        className="mt-4 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg font-medium transition duration-300"
+                    >
+                        Crear primer anuncio
+                    </button>
+                </div>
+            ) : (
+                <div className="grid gap-4">
+                    {anuncios.map((a) => (
+                        <div key={a.id} className="border border-gray-200 p-4 rounded-lg bg-white hover:bg-gray-50 transition duration-200">
+                            <div className="flex gap-4">
+                                {a.imagen && (
+                                    <div className="flex-shrink-0">
+                                        <div className="w-24 h-24 rounded-lg overflow-hidden">
+                                            <img 
+                                                src={a.imagen} 
+                                                alt={a.titulo}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                <div className="flex-1">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <strong className="text-xl block text-gray-800">{a.titulo}</strong>
+                                        <div className="flex gap-2 ml-4">
+                                            <button
+                                                onClick={() => iniciarEdicion(a)}
+                                                className="bg-blue-500 hover:bg-blue-600 text-white py-1 px-3 rounded text-sm transition duration-300"
+                                            >
+                                                Editar
+                                            </button>
+                                            <button
+                                                onClick={() => handleEliminar(a.id, a.titulo)}
+                                                className="bg-red-500 hover:bg-red-600 text-white py-1 px-3 rounded text-sm transition duration-300"
+                                            >
+                                                Eliminar
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <p className="text-gray-600 mb-2">{a.descripcion}</p>
+                                    
+                                    <div className="text-xs text-gray-500">
+                                        <p>Creado: {formatearFecha(a.creado_en)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* MODAL/TARJETA DE FORMULARIO - SOLO APARECE CUANDO mostrarForm ES true */}
+            {mostrarForm && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-xl overflow-hidden">
+                        <div className="bg-gray-100 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                            <h3 className="text-xl font-bold text-gray-800">
+                                {editandoId ? '✏️ Editar Anuncio' : '➕ Crear Nuevo Anuncio'}
+                            </h3>
+                            <button 
+                                onClick={cancelarForm}
+                                className="text-gray-500 hover:text-gray-700 font-bold text-xl"
+                            >
+                                &times;
+                            </button>
+                        </div>
+                        
+                        <div className="max-h-[70vh] overflow-y-auto">
+                            <form onSubmit={handleGuardar}>
+                                <div className="p-6 space-y-6">
+                                    {/* TÍTULO */}
+                                    <div>
+                                        <label className="block mb-2">
+                                            <span className="block text-sm font-semibold text-gray-700 mb-2">Título:</span>
+                                            <input
+                                                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                value={titulo}
+                                                onChange={(e) => setTitulo(e.target.value)}
+                                                placeholder="Escribe el título del anuncio"
+                                                required
+                                            />
+                                        </label>
+                                    </div>
+
+                                    {/* DESCRIPCIÓN */}
+                                    <div>
+                                        <label className="block mb-2">
+                                            <span className="block text-sm font-semibold text-gray-700 mb-2">Descripción:</span>
+                                            <textarea
+                                                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                rows="4"
+                                                value={descripcion}
+                                                onChange={(e) => setDescripcion(e.target.value)}
+                                                placeholder="Describe el contenido del anuncio"
+                                            />
+                                        </label>
+                                    </div>
+
+                                    {/* URL DE IMAGEN */}
+                                    <div>
+                                        <label className="block mb-2">
+                                            <span className="block text-sm font-semibold text-gray-700 mb-2">URL de Imagen (opcional):</span>
+                                            <input
+                                                type="url"
+                                                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                value={imagen}
+                                                onChange={(e) => setImagen(e.target.value)}
+                                                placeholder="https://ejemplo.com/imagen.jpg"
+                                            />
+                                            <p className="text-xs text-gray-500 mt-2">
+                                                Inserta la URL de una imagen para mostrar en el anuncio
+                                            </p>
+                                        </label>
+                                    </div>
+
+                                    {/* VISTA PREVIA */}
+                                    {imagen && (
+                                        <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                                            <p className="text-sm font-medium text-gray-700 mb-2">Vista previa:</p>
+                                            <div className="flex justify-center">
+                                                <div className="w-40 h-40 rounded-lg overflow-hidden border">
+                                                    <img 
+                                                        src={imagen} 
+                                                        alt="Vista previa" 
+                                                        className="w-full h-full object-cover"
+                                                        onError={(e) => {
+                                                            e.target.onerror = null;
+                                                            e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik00IDE2VjRDMTQgMTAgMjAgMTYgMjAgMTZINDBaTTQgMTZIOCIgc3Ryb2tlPSIjOWNhMGI4IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxwYXRoIGQ9Ik0yMCA0SDRDMy40NDc3MiA0IDMgNC40NDc3MiAzIDVWMTlDMi45OTk5NiAxOS41NTIyIDMuNDQ3NjggMjAgNCAyMEgyMEMyMC41NTIzIDIwIDIxIDE5LjU1MjMgMjEgMTlWNUMxOS45OTk5IDQuNDQ3NzIgMTkuNTUyMyA0IDE5IDRaIiBzdHJva2U9IiM5Y2EwYjgiIHN0cm9rZS13aWR0aD0iIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48L3N2Zz4=';
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={cancelarForm}
+                                        className="bg-gray-500 hover:bg-gray-600 text-white py-2 px-6 rounded-lg font-medium transition duration-300"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="bg-green-500 hover:bg-green-600 text-white py-2 px-6 rounded-lg font-medium transition duration-300"
+                                    >
+                                        {editandoId ? 'Actualizar anuncio' : 'Guardar anuncio'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+
+    const renderLibros = () => (
+        <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-2xl font-bold mb-6 text-green-600">Libros de Cuentas</h2>
+            
+            {loadingLibros ? (
+                <div className="text-center py-4">Cargando libros de cuentas...</div>
+            ) : librosCuentas.length === 0 ? (
+                <div className="p-8 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 text-center">
+                    <p className="text-lg">No hay libros de cuentas subidos aún.</p>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {librosCuentas.map((libro) => (
+                        <div key={libro.id} className="border border-gray-200 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition duration-200">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <h3 className="font-bold text-lg text-gray-800">{libro.titulo}</h3>
+                                    <p className="text-gray-600 mt-1">{libro.descripcion}</p>
+                                    <div className="mt-2 text-sm text-gray-500">
+                                        <p>Periodo: {formatearFecha(libro.fecha_periodo)}</p>
+                                        <p>Tipo: <span className="font-medium">{libro.tipo}</span></p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <a 
+                                        href={getDownloadUrl(libro.archivo)} 
+                                        download
+                                        className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded font-medium transition duration-300"
+                                    >
+                                        Descargar
+                                    </a>
+                                    <button
+                                        onClick={() => handleEliminarLibro(libro.id, libro.titulo)}
+                                        className="bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded font-medium transition duration-300"
+                                    >
+                                        Eliminar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+
+    const renderCalendario = () => (
+        <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Calendario de Eventos</h2>
+            
+            {cargandoCalendario ? (
+                <div className="text-center py-8">
+                    <p>Cargando calendario...</p>
+                </div>
+            ) : (
+                <Calendario 
+                    eventos={eventosCalendario}
+                    onGuardarEvento={guardarEventoCalendario}
+                    onEliminarEvento={eliminarEventoCalendario}
+                    modo="admin"
+                />
+            )}
+        </div>
+    );
+
+    const renderContacto = () => (
+        <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">Solicitudes de Contacto Web</h2>
+                <div className="text-sm text-gray-600">
+                    {mensajesFiltrados.length} mensaje{mensajesFiltrados.length !== 1 ? 's' : ''} encontrado{mensajesFiltrados.length !== 1 ? 's' : ''}
+                </div>
+            </div>
+
+            {/* FILTROS COMPACTOS */}
+            <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    {/* Barra de búsqueda */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Buscar:
+                        </label>
+                        <input
+                            type="text"
+                            className="w-full p-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Nombre, correo..."
+                            value={filtroBusqueda}
+                            onChange={(e) => setFiltroBusqueda(e.target.value)}
+                        />
+                    </div>
+                    
+                    {/* Filtro por fecha */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Fecha:
+                        </label>
+                        <input
+                            type="date"
+                            className="w-full p-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            value={filtroFecha}
+                            onChange={(e) => setFiltroFecha(e.target.value)}
+                        />
+                    </div>
+                    
+                    {/* Ordenar por */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Ordenar:
+                        </label>
+                        <select
+                            className="w-full p-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            value={filtroOrden}
+                            onChange={(e) => setFiltroOrden(e.target.value)}
+                        >
+                            <option value="recientes">Más recientes</option>
+                            <option value="antiguos">Más antiguos</option>
+                            <option value="nombre">Nombre (A-Z)</option>
+                        </select>
+                    </div>
+                    
+                    {/* Botón limpiar filtros */}
+                    <div className="flex items-end">
+                        <button
+                            onClick={limpiarFiltros}
+                            className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 px-3 text-sm rounded font-medium transition duration-300"
+                        >
+                            Limpiar filtros
+                        </button>
+                    </div>
+                </div>
+                
+                {/* Resumen de filtros activos */}
+                <div className="mt-3 flex flex-wrap gap-2">
+                    {filtroBusqueda && (
+                        <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
+                            Búsqueda: "{filtroBusqueda}"
+                        </span>
+                    )}
+                    {filtroFecha && (
+                        <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">
+                            Fecha: {filtroFecha}
+                        </span>
+                    )}
+                    {filtroOrden !== 'recientes' && (
+                        <span className="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded">
+                            Orden: {filtroOrden === 'antiguos' ? 'Más antiguos' : 'Nombre A-Z'}
+                        </span>
+                    )}
+                    {(filtroBusqueda || filtroFecha || filtroOrden !== 'recientes') && (
+                        <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
+                            Filtrado: {mensajesFiltrados.length} de {mensajesContacto.length}
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            {/* TABLA MÁS COMPACTA */}
+            <div className="overflow-x-auto">
+                {mensajesFiltrados.length === 0 ? (
+                    <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
+                        <p className="text-gray-500 text-lg mb-2">
+                            {filtroBusqueda || filtroFecha 
+                                ? "No se encontraron mensajes con los filtros aplicados" 
+                                : "No hay mensajes nuevos."}
+                        </p>
+                        {(filtroBusqueda || filtroFecha) && (
+                            <button
+                                onClick={limpiarFiltros}
+                                className="text-blue-500 hover:text-blue-700 font-medium"
+                            >
+                                Limpiar filtros para ver todos
+                            </button>
+                        )}
+                    </div>
+                ) : (
+                    <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
+                        <table className="w-full text-sm">
+                            <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10 }}>
+                                <tr>
+                                    <th className="px-3 py-2 border-b-2 border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
+                                        Fecha
+                                    </th>
+                                    <th className="px-3 py-2 border-b-2 border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
+                                        Nombre
+                                    </th>
+                                    <th className="px-3 py-2 border-b-2 border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
+                                        Correo
+                                    </th>
+                                    <th className="px-3 py-2 border-b-2 border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
+                                        Mensaje
+                                    </th>
+                                    <th className="px-3 py-2 border-b-2 border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
+                                        Acciones
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {mensajesActuales.map((msg) => (
+                                    <tr key={msg.id} className="hover:bg-gray-50 transition duration-150">
+                                        <td className="px-3 py-2 border-b border-gray-200 bg-white whitespace-nowrap">
+                                            <div className="text-xs text-gray-500">{formatearFecha(msg.fecha)}</div>
+                                        </td>
+                                        <td className="px-3 py-2 border-b border-gray-200 bg-white">
+                                            <div className="font-medium truncate max-w-[120px]" title={msg.nombre}>
+                                                {msg.nombre}
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-2 border-b border-gray-200 bg-white">
+                                            <a 
+                                                href={`mailto:${msg.correo}`} 
+                                                className="text-blue-600 hover:underline truncate max-w-[150px] block" 
+                                                title={msg.correo}
+                                            >
+                                                {msg.correo}
+                                            </a>
+                                        </td>
+                                        <td className="px-3 py-2 border-b border-gray-200 bg-white">
+                                            <div className="text-gray-500 truncate max-w-[180px]" title={msg.mensaje}>
+                                                {msg.mensaje.length > 40 ? msg.mensaje.substring(0, 40) + "..." : msg.mensaje}
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-2 border-b border-gray-200 bg-white whitespace-nowrap">
+                                            <div className="flex gap-1">
+                                                <button 
+                                                    onClick={() => abrirModalMensaje(msg)}
+                                                    className="bg-blue-500 hover:bg-blue-600 text-white py-1 px-2 rounded text-xs transition duration-200"
+                                                >
+                                                    Ver
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleEliminarMensaje(msg.id)}
+                                                    className="bg-red-500 hover:bg-red-600 text-white py-1 px-2 rounded text-xs transition duration-200"
+                                                >
+                                                    Eliminar
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+
+            {/* Paginación */}
+            {totalPaginas > 1 && (
+                <div className="flex justify-between items-center mt-4 p-3 bg-gray-50 rounded-lg">
+                    <button 
+                        onClick={irPaginaAnterior}
+                        disabled={paginaActual === 1}
+                        className={`px-3 py-1 rounded text-sm ${paginaActual === 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+                    >
+                        ← Anterior
+                    </button>
+                    
+                    <div className="flex items-center gap-2 text-sm">
+                        <span className="text-gray-700">
+                            Página {paginaActual} de {totalPaginas}
+                        </span>
+                    </div>
+
+                    <button 
+                        onClick={irPaginaSiguiente}
+                        disabled={paginaActual === totalPaginas}
+                        className={`px-3 py-1 rounded text-sm ${paginaActual === totalPaginas ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+                    >
+                        Siguiente →
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+
+    // NUEVA: RENDERIZADO DE SOLICITUDES DE INGRESO (del primer código)
+    const renderSolicitudes = () => {
+        // 1. Filtrar según la pestaña activa
+        const solicitudesFiltradas = solicitudesIngreso.filter(s => 
+            tabActiva === 'PENDIENTES' ? s.estado === 'PENDIENTE' : s.estado !== 'PENDIENTE'
+        );
+
+        // 2. Calcular paginación sobre los filtrados
+        const indiceUltimo = paginaSolicitudes * solicitudesPorPagina;
+        const indicePrimero = indiceUltimo - solicitudesPorPagina;
+        const solicitudesVisibles = solicitudesFiltradas.slice(indicePrimero, indiceUltimo);
+        const totalPaginasSol = Math.ceil(solicitudesFiltradas.length / solicitudesPorPagina);
+
+        return (
+            <div className="bg-white rounded-lg shadow-md p-6">
+                {/* ENCABEZADO CON PESTAÑAS */}
+                <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4">
+                    <h2 className="text-2xl font-bold text-gray-800">Solicitudes de Ingreso</h2>
+                    
+                    {/* BOTONES DE PESTAÑAS */}
+                    <div className="flex bg-gray-100 p-1 rounded-lg mt-4 md:mt-0">
+                        <button
+                            onClick={() => { setTabActiva('PENDIENTES'); setPaginaSolicitudes(1); }}
+                            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                                tabActiva === 'PENDIENTES' 
+                                ? 'bg-white text-blue-600 shadow-sm' 
+                                : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                        >
+                            Pendientes ({solicitudesIngreso.filter(s => s.estado === 'PENDIENTE').length})
+                        </button>
+                        <button
+                            onClick={() => { setTabActiva('HISTORIAL'); setPaginaSolicitudes(1); }}
+                            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                                tabActiva === 'HISTORIAL' 
+                                ? 'bg-white text-blue-600 shadow-sm' 
+                                : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                        >
+                            Historial
+                        </button>
+                    </div>
+                </div>
+
+                {solicitudesFiltradas.length === 0 ? (
+                    <p className="text-gray-500 text-center py-8">No hay solicitudes en esta sección.</p>
+                ) : (
+                    <>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full leading-normal">
+                                <thead>
+                                    <tr>
+                                        <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase">Fecha</th>
+                                        <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase">Postulante</th>
+                                        <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase">RUT</th>
+                                        <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-center text-xs font-semibold text-gray-600 uppercase">Estado</th>
+                                        <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-center text-xs font-semibold text-gray-600 uppercase">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {solicitudesVisibles.map((sol) => (
+                                        <tr key={sol.id}>
+                                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                                {formatearFecha(sol.fecha_solicitud)}
+                                            </td>
+                                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                                <div className="font-bold">{sol.nombre_completo}</div>
+                                                <div className="text-xs text-gray-500">{sol.email}</div>
+                                                <div className="text-xs text-gray-500 italic mt-1">"{sol.motivacion.substring(0, 40)}..."</div>
+                                            </td>
+                                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                                {sol.rut_dni}
+                                            </td>
+                                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm text-center">
+                                                <span className={`px-3 py-1 font-semibold text-xs rounded-full ${getBadgeColor(sol.estado)}`}>
+                                                    {sol.estado}
+                                                </span>
+                                            </td>
+                                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm text-center">
+                                                {sol.estado === 'PENDIENTE' ? (
+                                                    <div className="flex justify-center gap-2">
+                                                        <button onClick={() => handleEstadoSolicitud(sol.id, 'APROBADO')} className="bg-green-500 hover:bg-green-600 text-white p-2 rounded transition" title="Aprobar">
+                                                            ✅
+                                                        </button>
+                                                        <button onClick={() => handleEstadoSolicitud(sol.id, 'RECHAZADO')} className="bg-red-500 hover:bg-red-600 text-white p-2 rounded transition" title="Rechazar">
+                                                            ❌
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <button 
+                                                        onClick={() => handleEliminarSolicitud(sol.id)} 
+                                                        className="text-red-500 hover:text-red-700 text-xs font-bold border border-red-200 px-3 py-1 rounded hover:bg-red-50"
+                                                    >
+                                                        Eliminar Registro
+                                                    </button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* CONTROLES DE PAGINACIÓN (Solo si hay más de 1 página) */}
+                        {totalPaginasSol > 1 && (
+                            <div className="flex justify-between items-center mt-4 border-t pt-4">
+                                <button 
+                                    onClick={() => setPaginaSolicitudes(prev => Math.max(prev - 1, 1))}
+                                    disabled={paginaSolicitudes === 1}
+                                    className="px-3 py-1 rounded bg-gray-200 text-gray-600 disabled:opacity-50 hover:bg-gray-300"
+                                >
+                                    Anterior
+                                </button>
+                                <span className="text-sm text-gray-600">
+                                    Página {paginaSolicitudes} de {totalPaginasSol}
+                                </span>
+                                <button 
+                                    onClick={() => setPaginaSolicitudes(prev => Math.min(prev + 1, totalPaginasSol))}
+                                    disabled={paginaSolicitudes === totalPaginasSol}
+                                    className="px-3 py-1 rounded bg-gray-200 text-gray-600 disabled:opacity-50 hover:bg-gray-300"
+                                >
+                                    Siguiente
+                                </button>
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+        );
+    };
+
     return (
         <div 
             style={{
                 background: `url(${Fondo}) fixed center/cover no-repeat`,
                 minHeight: '100vh',
-                padding: '24px'
+                padding: '20px'
             }}
         >
             <div style={{
                 minHeight: '100vh',
-                margin: '-24px',
-                padding: '24px'
+                margin: '-20px',
+                padding: '20px'
             }}>
-                {/* HEADER CON NUEVO COLOR AZUL OSCURO Y LOGO */}
+                {/* Header (se mantiene igual) */}
                 <div 
                     className="rounded-lg shadow-md p-6 mb-6"
                     style={{
@@ -296,7 +1018,6 @@ function AdminView() {
                 >
                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-4">
-                            {/* LOGO */}
                             <div className="w-16 h-16 rounded-full overflow-hidden bg-white p-1">
                                 <img 
                                     src={Logo} 
@@ -305,450 +1026,223 @@ function AdminView() {
                                 />
                             </div>
                             <div>
-                                <h1 className="text-3xl font-bold text-white">
+                                <h1 className="text-2xl font-bold text-white">
                                     ONG Llave de Sol - Panel de Administración
                                 </h1>
-                                <p className="text-lg mt-2 text-white">
+                                <p className="text-base mt-2 text-white">
                                     ¡Bienvenido, <span className="font-semibold">{user?.username}!</span>
                                 </p>
                             </div>
                         </div>
                         <button 
                             onClick={logoutUser}
-                            className="bg-red-500 hover:bg-red-600 text-white py-2 px-6 rounded-lg font-medium transition duration-300"
+                            className="bg-red-500 hover:bg-red-600 text-white py-2 px-5 rounded-lg font-medium transition duration-300 text-sm"
                         >
                             Cerrar Sesión
                         </button>
                     </div>
                 </div>
 
-                <div className="flex gap-6 mb-8">
-                    <div className="flex-1 bg-white rounded-lg shadow-md p-6">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-bold">Anuncios actuales</h2>
-                            {!mostrarForm && (
-                                <button
-                                    onClick={() => setMostrarForm(true)}
-                                    className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg font-medium transition duration-300"
+                {/* Contenedor principal con navegación y contenido */}
+                <div className="flex gap-4">
+                    {/* Sidebar de navegación (izquierda) */}
+                    <div style={{
+                        width: '220px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        flexShrink: 0
+                    }}>
+                        <div className="bg-white rounded-lg shadow-md p-5">
+                            <h3 className="text-base font-bold mb-4 text-gray-700">Menú</h3>
+                            <div style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px'
+                            }}>
+                                <button 
+                                    onClick={() => setSeccionActiva('anuncios')}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 14px',
+                                        textAlign: 'left',
+                                        borderRadius: '6px',
+                                        border: 'none',
+                                        backgroundColor: seccionActiva === 'anuncios' ? '#3b82f6' : 'transparent',
+                                        color: seccionActiva === 'anuncios' ? 'white' : '#374151',
+                                        fontWeight: '500',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '10px',
+                                        fontSize: '14px'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (seccionActiva !== 'anuncios') {
+                                            e.target.style.backgroundColor = '#f3f4f6';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (seccionActiva !== 'anuncios') {
+                                            e.target.style.backgroundColor = 'transparent';
+                                        }
+                                    }}
                                 >
-                                    + Crear Nuevo Anuncio
+                                    <span>📢</span>
+                                    <span>Anuncios</span>
                                 </button>
-                            )}
-                        </div>
+                                
+                                <button 
+                                    onClick={() => setSeccionActiva('libros')}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 14px',
+                                        textAlign: 'left',
+                                        borderRadius: '6px',
+                                        border: 'none',
+                                        backgroundColor: seccionActiva === 'libros' ? '#3b82f6' : 'transparent',
+                                        color: seccionActiva === 'libros' ? 'white' : '#374151',
+                                        fontWeight: '500',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '10px',
+                                        fontSize: '14px'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (seccionActiva !== 'libros') {
+                                            e.target.style.backgroundColor = '#f3f4f6';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (seccionActiva !== 'libros') {
+                                            e.target.style.backgroundColor = 'transparent';
+                                        }
+                                    }}
+                                >
+                                    <span>📚</span>
+                                    <span>Libros de Cuentas</span>
+                                </button>
+                                
+                                <button 
+                                    onClick={() => setSeccionActiva('calendario')}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 14px',
+                                        textAlign: 'left',
+                                        borderRadius: '6px',
+                                        border: 'none',
+                                        backgroundColor: seccionActiva === 'calendario' ? '#3b82f6' : 'transparent',
+                                        color: seccionActiva === 'calendario' ? 'white' : '#374151',
+                                        fontWeight: '500',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '10px',
+                                        fontSize: '14px'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (seccionActiva !== 'calendario') {
+                                            e.target.style.backgroundColor = '#f3f4f6';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (seccionActiva !== 'calendario') {
+                                            e.target.style.backgroundColor = 'transparent';
+                                        }
+                                    }}
+                                >
+                                    <span>📅</span>
+                                    <span>Calendario</span>
+                                </button>
 
-                        {anuncios.length === 0 ? (
-                            <div className="p-8 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 text-center">
-                                <p className="text-lg">No hay anuncios creados aún.</p>
-                                <button
-                                    onClick={() => setMostrarForm(true)}
-                                    className="mt-4 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg font-medium transition duration-300"
+                                {/* NUEVO: Botón para Solicitudes de Ingreso */}
+                                <button 
+                                    onClick={() => setSeccionActiva('solicitudes')}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 14px',
+                                        textAlign: 'left',
+                                        borderRadius: '6px',
+                                        border: 'none',
+                                        backgroundColor: seccionActiva === 'solicitudes' ? '#3b82f6' : 'transparent',
+                                        color: seccionActiva === 'solicitudes' ? 'white' : '#374151',
+                                        fontWeight: '500',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '10px',
+                                        fontSize: '14px'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (seccionActiva !== 'solicitudes') {
+                                            e.target.style.backgroundColor = '#f3f4f6';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (seccionActiva !== 'solicitudes') {
+                                            e.target.style.backgroundColor = 'transparent';
+                                        }
+                                    }}
                                 >
-                                    Crear primer anuncio
+                                    <span>👥</span>
+                                    <span>Solicitudes Ingreso</span>
+                                </button>
+                                
+                                <button 
+                                    onClick={() => setSeccionActiva('contacto')}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 14px',
+                                        textAlign: 'left',
+                                        borderRadius: '6px',
+                                        border: 'none',
+                                        backgroundColor: seccionActiva === 'contacto' ? '#3b82f6' : 'transparent',
+                                        color: seccionActiva === 'contacto' ? 'white' : '#374151',
+                                        fontWeight: '500',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '10px',
+                                        fontSize: '14px'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (seccionActiva !== 'contacto') {
+                                            e.target.style.backgroundColor = '#f3f4f6';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (seccionActiva !== 'contacto') {
+                                            e.target.style.backgroundColor = 'transparent';
+                                        }
+                                    }}
+                                >
+                                    <span>✉️</span>
+                                    <span>Solicitudes Contacto</span>
                                 </button>
                             </div>
-                        ) : (
-                            <div className="grid gap-4">
-                                {anuncios.map((a) => (
-                                    <div key={a.id} className="border border-gray-200 p-4 rounded-lg bg-white hover:bg-gray-50 transition duration-200">
-                                        <div className="flex gap-4">
-                                            {a.imagen && (
-                                                <div className="flex-shrink-0">
-                                                    <div className="w-24 h-24 rounded-lg overflow-hidden">
-                                                        <img 
-                                                            src={a.imagen} 
-                                                            alt={a.titulo}
-                                                            className="w-full h-full object-cover"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            )}
-                                            
-                                            <div className="flex-1">
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <strong className="text-xl block text-gray-800">{a.titulo}</strong>
-                                                    <div className="flex gap-2 ml-4">
-                                                        <button
-                                                            onClick={() => iniciarEdicion(a)}
-                                                            className="bg-blue-500 hover:bg-blue-600 text-white py-1 px-3 rounded text-sm transition duration-300"
-                                                        >
-                                                            Editar
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleEliminar(a.id, a.titulo)}
-                                                            className="bg-red-500 hover:bg-red-600 text-white py-1 px-3 rounded text-sm transition duration-300"
-                                                        >
-                                                            Eliminar
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                                <p className="text-gray-600 mb-2">{a.descripcion}</p>
-                                                
-                                                <div className="text-xs text-gray-500">
-                                                    <p>Creado: {formatearFecha(a.creado_en)}</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                        </div>
                     </div>
 
-                    <div className="w-96 space-y-6">
+                    {/* Contenido principal (centro) */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                        {renderSeccionActiva()}
+                    </div>
+
+                    {/* Sidebar de Mensajes FIJO SOLO (derecha) - SIN Libros de Cuentas */}
+                    <div style={{ 
+                        width: '380px',
+                        flexShrink: 0
+                    }}>
                         <MensajesPanel userType="ADMIN" />
-
-                        <div className="bg-white rounded-lg shadow-md p-6">
-                            <h2 className="text-2xl font-bold mb-4 text-green-600">Libros de Cuentas</h2>
-                            
-                            {loadingLibros ? (
-                                <div className="text-center py-4">Cargando libros de cuentas...</div>
-                            ) : librosCuentas.length === 0 ? (
-                                <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 text-center">
-                                    <p>No hay libros de cuentas subidos aún.</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-3 max-h-96 overflow-y-auto">
-                                    {librosCuentas.map((libro) => (
-                                        <div key={libro.id} className="border border-gray-200 p-3 rounded-lg bg-gray-50">
-                                            <h3 className="font-bold text-gray-800">{libro.titulo}</h3>
-                                            <p className="text-sm text-gray-600 mt-1">{libro.descripcion}</p>
-                                            <div className="mt-2 text-xs text-gray-500">
-                                                <p>Periodo: {formatearFecha(libro.fecha_periodo)}</p>
-                                                <p>Tipo: {libro.tipo}</p>
-                                            </div>
-                                            <div className="flex gap-2 mt-3">
-                                                <a 
-                                                    href={getDownloadUrl(libro.archivo)} 
-                                                    download
-                                                    className="bg-blue-500 hover:bg-blue-600 text-white py-1 px-2 rounded text-xs transition duration-300"
-                                                >
-                                                    Descargar
-                                                </a>
-                                                <button
-                                                    onClick={() => handleEliminarLibro(libro.id, libro.titulo)}
-                                                    className="bg-red-500 hover:bg-red-600 text-white py-1 px-2 rounded text-xs transition duration-300"
-                                                >
-                                                    Eliminar
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        {mostrarForm && (
-                            <div className="bg-white rounded-lg shadow-md p-6">
-                                <form onSubmit={handleGuardar}>
-                                    <h3 className="text-xl font-bold mb-4 text-center">
-                                        {editandoId ? 'Editar Anuncio' : 'Crear Nuevo Anuncio'}
-                                    </h3>
-
-                                    <div className="space-y-4">
-                                        <label className="block">
-                                            <span className="block text-sm font-medium mb-2">Título:</span>
-                                            <input
-                                                className="border w-full p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                value={titulo}
-                                                onChange={(e) => setTitulo(e.target.value)}
-                                                placeholder="Escribe el título aquí..."
-                                                required
-                                            />
-                                        </label>
-
-                                        <label className="block">
-                                            <span className="block text-sm font-medium mb-2">Descripción:</span>
-                                            <textarea
-                                                className="border w-full p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                rows="4"
-                                                value={descripcion}
-                                                onChange={(e) => setDescripcion(e.target.value)}
-                                                placeholder="Escribe la descripción aquí..."
-                                            />
-                                        </label>
-
-                                        <label className="block">
-                                            <span className="block text-sm font-medium mb-2">URL de Imagen (opcional):</span>
-                                            <input
-                                                type="url"
-                                                className="border w-full p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                value={imagen}
-                                                onChange={(e) => setImagen(e.target.value)}
-                                                placeholder="https://ejemplo.com/imagen.jpg"
-                                            />
-                                            <p className="text-xs text-gray-500 mt-1">
-                                                Inserta la URL de una imagen para el anuncio
-                                            </p>
-                                        </label>
-
-                                        {imagen && (
-                                            <div className="mt-2">
-                                                <p className="text-sm font-medium mb-2">Vista previa:</p>
-                                                <div className="w-32 h-32 rounded-lg overflow-hidden border">
-                                                    <img 
-                                                        src={imagen} 
-                                                        alt="Vista previa" 
-                                                        className="w-full h-full object-cover"
-                                                        onError={(e) => {
-                                                            e.target.style.display = 'none';
-                                                        }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="flex gap-3 mt-6">
-                                        <button
-                                            type="submit"
-                                            className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded font-medium transition duration-300"
-                                        >
-                                            {editandoId ? 'Actualizar' : 'Guardar'} anuncio
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={cancelarForm}
-                                            className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded font-medium transition duration-300"
-                                        >
-                                            Cancelar
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        )}
                     </div>
                 </div>
 
-                {/* --- NUEVA SECCIÓN: SOLICITUDES DE ADMISIÓN (SOCIOS) --- */}
-                {/* --- SECCIÓN: SOLICITUDES DE ADMISIÓN (MEJORADA) --- */}
-                <div className="bg-white rounded-lg shadow-md p-6 mt-8">
-                    
-                    {/* ENCABEZADO CON PESTAÑAS */}
-                    <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4">
-                        <h2 className="text-2xl font-bold text-gray-800">Solicitudes de Ingreso</h2>
-                        
-                        {/* BOTONES DE PESTAÑAS */}
-                        <div className="flex bg-gray-100 p-1 rounded-lg mt-4 md:mt-0">
-                            <button
-                                onClick={() => { setTabActiva('PENDIENTES'); setPaginaSolicitudes(1); }}
-                                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                                    tabActiva === 'PENDIENTES' 
-                                    ? 'bg-white text-blue-600 shadow-sm' 
-                                    : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                            >
-                                Pendientes ({solicitudesIngreso.filter(s => s.estado === 'PENDIENTE').length})
-                            </button>
-                            <button
-                                onClick={() => { setTabActiva('HISTORIAL'); setPaginaSolicitudes(1); }}
-                                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                                    tabActiva === 'HISTORIAL' 
-                                    ? 'bg-white text-blue-600 shadow-sm' 
-                                    : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                            >
-                                Historial
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* LÓGICA DE FILTRADO Y PAGINACIÓN LOCAL */}
-                    {(() => {
-                        // 1. Filtrar según la pestaña activa
-                        const solicitudesFiltradas = solicitudesIngreso.filter(s => 
-                            tabActiva === 'PENDIENTES' ? s.estado === 'PENDIENTE' : s.estado !== 'PENDIENTE'
-                        );
-
-                        // 2. Calcular paginación sobre los filtrados
-                        const indiceUltimo = paginaSolicitudes * solicitudesPorPagina;
-                        const indicePrimero = indiceUltimo - solicitudesPorPagina;
-                        const solicitudesVisibles = solicitudesFiltradas.slice(indicePrimero, indiceUltimo);
-                        const totalPaginasSol = Math.ceil(solicitudesFiltradas.length / solicitudesPorPagina);
-
-                        if (solicitudesFiltradas.length === 0) {
-                            return <p className="text-gray-500 text-center py-8">No hay solicitudes en esta sección.</p>;
-                        }
-
-                        return (
-                            <>
-                                <div className="overflow-x-auto">
-                                    <table className="min-w-full leading-normal">
-                                        <thead>
-                                            <tr>
-                                                <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase">Fecha</th>
-                                                <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase">Postulante</th>
-                                                <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase">RUT</th>
-                                                <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-center text-xs font-semibold text-gray-600 uppercase">Estado</th>
-                                                <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-center text-xs font-semibold text-gray-600 uppercase">Acciones</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {solicitudesVisibles.map((sol) => (
-                                                <tr key={sol.id}>
-                                                    <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                                                        {formatearFecha(sol.fecha_solicitud)}
-                                                    </td>
-                                                    <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                                                        <div className="font-bold">{sol.nombre_completo}</div>
-                                                        <div className="text-xs text-gray-500">{sol.email}</div>
-                                                        <div className="text-xs text-gray-500 italic mt-1">"{sol.motivacion.substring(0, 40)}..."</div>
-                                                    </td>
-                                                    <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                                                        {sol.rut_dni}
-                                                    </td>
-                                                    <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm text-center">
-                                                        <span className={`px-3 py-1 font-semibold text-xs rounded-full ${getBadgeColor(sol.estado)}`}>
-                                                            {sol.estado}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm text-center">
-                                                        {sol.estado === 'PENDIENTE' ? (
-                                                            <div className="flex justify-center gap-2">
-                                                                <button onClick={() => handleEstadoSolicitud(sol.id, 'APROBADO')} className="bg-green-500 hover:bg-green-600 text-white p-2 rounded transition" title="Aprobar">
-                                                                    ✅
-                                                                </button>
-                                                                <button onClick={() => handleEstadoSolicitud(sol.id, 'RECHAZADO')} className="bg-red-500 hover:bg-red-600 text-white p-2 rounded transition" title="Rechazar">
-                                                                    ❌
-                                                                </button>
-                                                            </div>
-                                                        ) : (
-                                                            <button 
-                                                                onClick={() => handleEliminarSolicitud(sol.id)} 
-                                                                className="text-red-500 hover:text-red-700 text-xs font-bold border border-red-200 px-3 py-1 rounded hover:bg-red-50"
-                                                            >
-                                                                Eliminar Registro
-                                                            </button>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                {/* CONTROLES DE PAGINACIÓN (Solo si hay más de 1 página) */}
-                                {totalPaginasSol > 1 && (
-                                    <div className="flex justify-between items-center mt-4 border-t pt-4">
-                                        <button 
-                                            onClick={() => setPaginaSolicitudes(prev => Math.max(prev - 1, 1))}
-                                            disabled={paginaSolicitudes === 1}
-                                            className="px-3 py-1 rounded bg-gray-200 text-gray-600 disabled:opacity-50 hover:bg-gray-300"
-                                        >
-                                            Anterior
-                                        </button>
-                                        <span className="text-sm text-gray-600">
-                                            Página {paginaSolicitudes} de {totalPaginasSol}
-                                        </span>
-                                        <button 
-                                            onClick={() => setPaginaSolicitudes(prev => Math.min(prev + 1, totalPaginasSol))}
-                                            disabled={paginaSolicitudes === totalPaginasSol}
-                                            className="px-3 py-1 rounded bg-gray-200 text-gray-600 disabled:opacity-50 hover:bg-gray-300"
-                                        >
-                                            Siguiente
-                                        </button>
-                                    </div>
-                                )}
-                            </>
-                        );
-                    })()}
-                </div>
-
-                {/* --- SECCIÓN: TABLA DE SOLICITUDES DE CONTACTO CON PAGINACION --- */}
-                <div className="bg-white rounded-lg shadow-md p-6 mt-8">
-                    <h2 className="text-2xl font-bold text-gray-800 mb-6 border-b pb-4">
-                        Solicitudes de Contacto Web
-                    </h2>
-
-                    {mensajesContacto.length === 0 ? (
-                        <p className="text-gray-500 text-center py-4">No hay mensajes nuevos.</p>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full leading-normal">
-                                <thead>
-                                    <tr>
-                                        <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                            Fecha
-                                        </th>
-                                        <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                            Nombre
-                                        </th>
-                                        <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                            Correo
-                                        </th>
-                                        <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                            Mensaje
-                                        </th>
-                                        <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                            Acciones
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {mensajesActuales.map((msg) => (
-                                        <tr key={msg.id}>
-                                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                                                {formatearFecha(msg.fecha)}
-                                            </td>
-                                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm font-medium">
-                                                {msg.nombre}
-                                            </td>
-                                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm text-blue-600">
-                                                <a href={`mailto:${msg.correo}`}>{msg.correo}</a>
-                                            </td>
-                                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm text-gray-500">
-                                                {/* Mostrar mensaje cortado si es muy largo visualmente */}
-                                                {msg.mensaje.length > 50 ? msg.mensaje.substring(0, 50) + "..." : msg.mensaje}
-                                            </td>
-                                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                                                <div className="flex gap-2">
-                                                    <button 
-                                                        onClick={() => abrirModalMensaje(msg)}
-                                                        className="bg-blue-100 text-blue-600 hover:bg-blue-200 hover:text-blue-900 font-bold py-1 px-3 rounded text-xs transition duration-200"
-                                                    >
-                                                        Ver
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => handleEliminarMensaje(msg.id)}
-                                                        className="bg-red-100 text-red-600 hover:bg-red-200 hover:text-red-900 font-bold py-1 px-3 rounded text-xs transition duration-200"
-                                                    >
-                                                        Borrar
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-
-                            {/* Controles de Paginacion */}
-                            {totalPaginas > 1 && (
-                                <div className="flex justify-between items-center mt-4">
-                                    <button 
-                                        onClick={irPaginaAnterior}
-                                        disabled={paginaActual === 1}
-                                        className={`px-4 py-2 rounded ${paginaActual === 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-                                    >
-                                        Anterior
-                                    </button>
-                                    
-                                    <span className="text-gray-700">
-                                        Página {paginaActual} de {totalPaginas}
-                                    </span>
-
-                                    <button 
-                                        onClick={irPaginaSiguiente}
-                                        disabled={paginaActual === totalPaginas}
-                                        className={`px-4 py-2 rounded ${paginaActual === totalPaginas ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-                                    >
-                                        Siguiente
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-
-                {/* MODAL CORREGIDO */}
+                {/* Modal de Mensaje (se mantiene igual) */}
                 {mensajeSeleccionado && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
                         <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden">

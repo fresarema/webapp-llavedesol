@@ -140,3 +140,31 @@ class DonacionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Donacion
         fields = '__all__'
+
+class EventoCalendario(models.Model):
+    TIPO_EVENTO = [
+        ('REUNION', 'Reunión'),
+        ('EVENTO', 'Evento público'),
+        ('VOLUNTARIADO', 'Voluntariado'),
+        ('CAPACITACION', 'Capacitación'),
+        ('RECAUDACION', 'Recaudación de fondos'),
+        ('ADMINISTRATIVO', 'Administrativo'),
+    ]
+    
+    titulo = models.CharField(max_length=200)
+    descripcion = models.TextField(blank=True, null=True)
+    fecha = models.DateField()
+    hora_inicio = models.TimeField(blank=True, null=True)
+    hora_fin = models.TimeField(blank=True, null=True)
+    tipo_evento = models.CharField(max_length=20, choices=TIPO_EVENTO, default='REUNION')
+    lugar = models.CharField(max_length=200, blank=True, null=True)
+    responsable = models.CharField(max_length=100, blank=True, null=True)
+    
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['fecha', 'hora_inicio']
+
+    def __str__(self):
+        return f"{self.titulo} - {self.fecha}"

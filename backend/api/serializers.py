@@ -1,6 +1,6 @@
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework import serializers
-from .models import Anuncio, LibroCuenta, Mensaje, Donacion, Contacto, SolicitudIngreso
+from .models import Anuncio, LibroCuenta, Mensaje, Donacion, Contacto, SolicitudIngreso,EventoCalendario
 
 # -----------------------------------------------------------
 # SERIALIZER DE TOKEN (JWT)
@@ -70,3 +70,9 @@ class DonacionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Donacion
         fields = '__all__'
+
+class EventoCalendarioSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EventoCalendario
+        fields = '__all__'
+
