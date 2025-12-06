@@ -1,9 +1,10 @@
 from django.shortcuts import render
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers import MyTokenObtainPairSerializer
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, permissions, status, generics
 from rest_framework.decorators import action, api_view 
 from rest_framework.response import Response
+from rest_framework.permissions import AllowAny, IsAdminUser
 from django.db.models import Q
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt 
@@ -15,8 +16,8 @@ import django.db.utils
 from django.db import transaction
 
 # --- Dependencias ---
-from .models import Anuncio, LibroCuenta, Mensaje, Contacto, Donacion
-from .serializers import AnuncioSerializer, LibroCuentaSerializer, MensajeSerializer, ContactoSerializer, DonacionSerializer 
+from .models import Anuncio, LibroCuenta, Mensaje, Contacto, Donacion, SolicitudIngreso
+from .serializers import AnuncioSerializer, LibroCuentaSerializer, MensajeSerializer, ContactoSerializer, DonacionSerializer , SolicitudIngresoSerializer
 
 # --- SDK de Mercado Pago (Python) ---
 import mercadopago
@@ -55,6 +56,21 @@ class LibroCuentaViewSet(viewsets.ModelViewSet):
 class ContactoViewSet(viewsets.ModelViewSet):
     queryset = Contacto.objects.all().order_by('-fecha')
     serializer_class = ContactoSerializer
+
+class CrearSolicitudView(generics.CreateAPIView):
+    queryset = SolicitudIngreso.objects.all()
+    serializer_class = SolicitudIngresoSerializer
+    permission_classes = [AllowAny] 
+
+class ListarSolicitudesView(generics.ListAPIView):
+    queryset = SolicitudIngreso.objects.all().order_by('-fecha_solicitud')
+    serializer_class = SolicitudIngresoSerializer
+    permission_classes = [IsAdminUser] 
+
+class ActualizarSolicitudView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = SolicitudIngreso.objects.all()
+    serializer_class = SolicitudIngresoSerializer
+    permission_classes = [IsAdminUser]
 
 class MensajeViewSet(viewsets.ModelViewSet):
     serializer_class = MensajeSerializer

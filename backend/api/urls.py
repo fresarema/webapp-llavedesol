@@ -9,7 +9,10 @@ from .views import (
     MensajeViewSet,
     ContactoViewSet,
     crear_preferencia, 
-    webhook_mp 
+    webhook_mp,
+    CrearSolicitudView,
+    ListarSolicitudesView,
+    ActualizarSolicitudView
 )
 
 router = DefaultRouter()
@@ -24,6 +27,9 @@ urlpatterns = [
     
 
     path('', include(router.urls)),
+    path('solicitud-ingreso/', CrearSolicitudView.as_view(), name='crear_solicitud'),
+    path('admin/solicitudes/', ListarSolicitudesView.as_view(), name='listar_solicitudes'),
+    path('admin/solicitudes/<int:pk>/', ActualizarSolicitudView.as_view(), name='actualizar_solicitud'),
     
     # --------------------------------------------------------
     # RUTAS PARA MERCADO PAGO

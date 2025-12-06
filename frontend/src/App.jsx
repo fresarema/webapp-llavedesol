@@ -9,6 +9,7 @@ import AdminView from './pages/AdminView';
 import TesoreroView from './pages/TesoreroView';
 import ProtectedRoute from './utils/ProtectedRoute';
 import Donaciones from './components/Donaciones/mercado-pago';
+import FormularioAdmision from './components/FormularioAdmision/FormularioAdmision';
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/donaciones" element={<Donaciones />} />
+        <Route path="/unete" element={<FormularioAdmision />} />
 
         {/* Rutas Protegidas */}
         <Route 

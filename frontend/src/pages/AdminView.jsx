@@ -14,7 +14,7 @@ function AdminView() {
     const [librosCuentas, setLibrosCuentas] = useState([]);
     // Estado para mensajes de contacto
     const [mensajesContacto, setMensajesContacto] = useState([]);
-
+    const [solicitudesIngreso, setSolicitudesIngreso] = useState([]);
     const [titulo, setTitulo] = useState("");
     const [descripcion, setDescripcion] = useState("");
     const [imagen, setImagen] = useState("");
@@ -28,11 +28,17 @@ function AdminView() {
     // --- ESTADOS PARA PAGINACION DE MENSAJES ---
     const [paginaActual, setPaginaActual] = useState(1);
     const mensajesPorPagina = 10;
+    // --- ESTADOS PARA PAGINACION DE SOLICITUDES DE ADMISION ---
+    const [paginaSolicitudes, setPaginaSolicitudes] = useState(1);
+    const solicitudesPorPagina = 5; 
+    const [tabActiva, setTabActiva] = useState('PENDIENTES'); 
+
 
     useEffect(() => {
       cargarAnuncios();
       cargarLibrosCuentas();
-      cargarMensajesContacto(); // Cargar mensajes al inicio
+      cargarMensajesContacto(); 
+      cargarSolicitudesIngreso();
     }, []);
 
     const cargarAnuncios = async () => {
@@ -165,6 +171,84 @@ function AdminView() {
         }
         return `http://127.0.0.1:8000${archivoPath}`;
     };
+
+    // LOGICA DE SOLICITUDES DE INGRESO
+    const cargarSolicitudesIngreso = async () => {
+        try {
+            // Busca token JWT
+            let authTokens = localStorage.getItem('authTokens') ? JSON.parse(localStorage.getItem('authTokens')) : null;
+            
+            if (!authTokens) {
+                console.error("No hay token de acceso. ¿Estás logueado?");
+                return;
+            }
+
+            const response = await axios.get('http://127.0.0.1:8000/api/admin/solicitudes/', {
+                headers: {
+                    'Authorization': `Bearer ${authTokens.access}`
+                }
+            });
+            
+            setSolicitudesIngreso(response.data);
+        } catch (error) {
+            console.error("Error cargando solicitudes de ingreso", error);
+
+        }
+    };
+
+    // Funcion para Aprobar o Rechazar
+    const handleEstadoSolicitud = async (id, nuevoEstado) => {
+        try {
+            let authTokens = localStorage.getItem('authTokens') ? JSON.parse(localStorage.getItem('authTokens')) : null;
+
+            await axios.patch(`http://127.0.0.1:8000/api/admin/solicitudes/${id}/`, 
+                { estado: nuevoEstado }, // Datos
+                { 
+                    headers: {
+                        'Authorization': `Bearer ${authTokens?.access}`
+                    }
+                }
+            );
+            
+            cargarSolicitudesIngreso();
+            alert(`Solicitud ${nuevoEstado.toLowerCase()} correctamente.`);
+        } catch (error) {
+            console.error("Error actualizando estado", error);
+            alert("Hubo un error al actualizar el estado.");
+        }
+    };
+
+    // Funcion para borrar y darle ooootra oportunidad! Otra oportunidaaad!
+    const handleEliminarSolicitud = async (id) => {
+        if (!window.confirm("¿Estás seguro? Al borrarlo, el RUT quedará liberado para postular nuevamente.")) {
+            return;
+        }
+
+        try {
+            let authTokens = localStorage.getItem('authTokens') ? JSON.parse(localStorage.getItem('authTokens')) : null;
+            await axios.delete(`http://127.0.0.1:8000/api/admin/solicitudes/${id}/`, { 
+                headers: { 'Authorization': `Bearer ${authTokens?.access}` }
+            });
+            cargarSolicitudesIngreso(); // Recargar lista
+            alert("Registro eliminado.");
+        } catch (error) {
+            console.error(error);
+            alert("Error al eliminar.");
+        }
+    };
+
+    // Ayuda visual para los colores de las etiquetas de estado
+    const getBadgeColor = (estado) => {
+        switch(estado) {
+            case 'APROBADO': return 'bg-green-100 text-green-800 border-green-200';
+            case 'RECHAZADO': return 'bg-red-100 text-red-800 border-red-200';
+            default: return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        }
+    };
+
+
+
+
 
     // Funciones para el Modal de Mensaje
     const abrirModalMensaje = (mensaje) => {
@@ -433,6 +517,140 @@ function AdminView() {
                             </div>
                         )}
                     </div>
+                </div>
+
+                {/* --- NUEVA SECCIÓN: SOLICITUDES DE ADMISIÓN (SOCIOS) --- */}
+                {/* --- SECCIÓN: SOLICITUDES DE ADMISIÓN (MEJORADA) --- */}
+                <div className="bg-white rounded-lg shadow-md p-6 mt-8">
+                    
+                    {/* ENCABEZADO CON PESTAÑAS */}
+                    <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4">
+                        <h2 className="text-2xl font-bold text-gray-800">Solicitudes de Ingreso</h2>
+                        
+                        {/* BOTONES DE PESTAÑAS */}
+                        <div className="flex bg-gray-100 p-1 rounded-lg mt-4 md:mt-0">
+                            <button
+                                onClick={() => { setTabActiva('PENDIENTES'); setPaginaSolicitudes(1); }}
+                                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                                    tabActiva === 'PENDIENTES' 
+                                    ? 'bg-white text-blue-600 shadow-sm' 
+                                    : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                            >
+                                Pendientes ({solicitudesIngreso.filter(s => s.estado === 'PENDIENTE').length})
+                            </button>
+                            <button
+                                onClick={() => { setTabActiva('HISTORIAL'); setPaginaSolicitudes(1); }}
+                                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                                    tabActiva === 'HISTORIAL' 
+                                    ? 'bg-white text-blue-600 shadow-sm' 
+                                    : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                            >
+                                Historial
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* LÓGICA DE FILTRADO Y PAGINACIÓN LOCAL */}
+                    {(() => {
+                        // 1. Filtrar según la pestaña activa
+                        const solicitudesFiltradas = solicitudesIngreso.filter(s => 
+                            tabActiva === 'PENDIENTES' ? s.estado === 'PENDIENTE' : s.estado !== 'PENDIENTE'
+                        );
+
+                        // 2. Calcular paginación sobre los filtrados
+                        const indiceUltimo = paginaSolicitudes * solicitudesPorPagina;
+                        const indicePrimero = indiceUltimo - solicitudesPorPagina;
+                        const solicitudesVisibles = solicitudesFiltradas.slice(indicePrimero, indiceUltimo);
+                        const totalPaginasSol = Math.ceil(solicitudesFiltradas.length / solicitudesPorPagina);
+
+                        if (solicitudesFiltradas.length === 0) {
+                            return <p className="text-gray-500 text-center py-8">No hay solicitudes en esta sección.</p>;
+                        }
+
+                        return (
+                            <>
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full leading-normal">
+                                        <thead>
+                                            <tr>
+                                                <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase">Fecha</th>
+                                                <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase">Postulante</th>
+                                                <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase">RUT</th>
+                                                <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-center text-xs font-semibold text-gray-600 uppercase">Estado</th>
+                                                <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-center text-xs font-semibold text-gray-600 uppercase">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {solicitudesVisibles.map((sol) => (
+                                                <tr key={sol.id}>
+                                                    <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                                        {formatearFecha(sol.fecha_solicitud)}
+                                                    </td>
+                                                    <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                                        <div className="font-bold">{sol.nombre_completo}</div>
+                                                        <div className="text-xs text-gray-500">{sol.email}</div>
+                                                        <div className="text-xs text-gray-500 italic mt-1">"{sol.motivacion.substring(0, 40)}..."</div>
+                                                    </td>
+                                                    <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                                        {sol.rut_dni}
+                                                    </td>
+                                                    <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm text-center">
+                                                        <span className={`px-3 py-1 font-semibold text-xs rounded-full ${getBadgeColor(sol.estado)}`}>
+                                                            {sol.estado}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm text-center">
+                                                        {sol.estado === 'PENDIENTE' ? (
+                                                            <div className="flex justify-center gap-2">
+                                                                <button onClick={() => handleEstadoSolicitud(sol.id, 'APROBADO')} className="bg-green-500 hover:bg-green-600 text-white p-2 rounded transition" title="Aprobar">
+                                                                    ✅
+                                                                </button>
+                                                                <button onClick={() => handleEstadoSolicitud(sol.id, 'RECHAZADO')} className="bg-red-500 hover:bg-red-600 text-white p-2 rounded transition" title="Rechazar">
+                                                                    ❌
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <button 
+                                                                onClick={() => handleEliminarSolicitud(sol.id)} 
+                                                                className="text-red-500 hover:text-red-700 text-xs font-bold border border-red-200 px-3 py-1 rounded hover:bg-red-50"
+                                                            >
+                                                                Eliminar Registro
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* CONTROLES DE PAGINACIÓN (Solo si hay más de 1 página) */}
+                                {totalPaginasSol > 1 && (
+                                    <div className="flex justify-between items-center mt-4 border-t pt-4">
+                                        <button 
+                                            onClick={() => setPaginaSolicitudes(prev => Math.max(prev - 1, 1))}
+                                            disabled={paginaSolicitudes === 1}
+                                            className="px-3 py-1 rounded bg-gray-200 text-gray-600 disabled:opacity-50 hover:bg-gray-300"
+                                        >
+                                            Anterior
+                                        </button>
+                                        <span className="text-sm text-gray-600">
+                                            Página {paginaSolicitudes} de {totalPaginasSol}
+                                        </span>
+                                        <button 
+                                            onClick={() => setPaginaSolicitudes(prev => Math.min(prev + 1, totalPaginasSol))}
+                                            disabled={paginaSolicitudes === totalPaginasSol}
+                                            className="px-3 py-1 rounded bg-gray-200 text-gray-600 disabled:opacity-50 hover:bg-gray-300"
+                                        >
+                                            Siguiente
+                                        </button>
+                                    </div>
+                                )}
+                            </>
+                        );
+                    })()}
                 </div>
 
                 {/* --- SECCIÓN: TABLA DE SOLICITUDES DE CONTACTO CON PAGINACION --- */}

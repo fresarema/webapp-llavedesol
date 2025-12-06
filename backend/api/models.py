@@ -5,6 +5,27 @@ from rest_framework import serializers
 ## MODELOS EXISTENTES
 ## -----------------------------------------------------------
 
+#modelo para formulario de admision
+class SolicitudIngreso(models.Model):
+    ESTADOS = [
+        ('PENDIENTE', 'Pendiente'),
+        ('APROBADO', 'Aprobado'),
+        ('RECHAZADO', 'Rechazado'),
+    ]
+
+    nombre_completo = models.CharField(max_length=255)
+    rut_dni = models.CharField(max_length=20, unique=True, verbose_name="RUT/DNI")
+    fecha_nacimiento = models.DateField()
+    email = models.EmailField(unique=True)
+    telefono = models.CharField(max_length=20)
+    profesion = models.CharField(max_length=100, blank=True, null=True)
+    motivacion = models.TextField(verbose_name="¿Por qué quieres unirte?", blank=True)
+    estado = models.CharField(max_length=20, choices=ESTADOS, default='PENDIENTE')
+    fecha_solicitud = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.nombre_completo} - {self.estado}"
+
 class Anuncio(models.Model):
     titulo = models.CharField(max_length=200)
     descripcion = models.TextField()
@@ -13,7 +34,7 @@ class Anuncio(models.Model):
 
     def __str__(self):
         return self.titulo
-# Create your models here.
+
 
 class LibroCuenta(models.Model):
     TIPO_CHOICES = [

@@ -1,6 +1,6 @@
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework import serializers
-from .models import Anuncio, LibroCuenta, Mensaje, Donacion, Contacto
+from .models import Anuncio, LibroCuenta, Mensaje, Donacion, Contacto, SolicitudIngreso
 
 # -----------------------------------------------------------
 # SERIALIZER DE TOKEN (JWT)
@@ -50,6 +50,13 @@ class ContactoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Contacto
         fields = '__all__'
+
+class SolicitudIngresoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SolicitudIngreso
+        fields = '__all__'
+        # Estado solo lectura para el público
+        read_only_fields = ( 'fecha_solicitud',)
 
 # -----------------------------------------------------------
 # SERIALIZER REQUERIDO PARA MERCADO PAGO
