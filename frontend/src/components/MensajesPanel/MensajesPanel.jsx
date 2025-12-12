@@ -1,261 +1,258 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { mensajesService } from "../../services/mensajesService";
 
+/**
+ * MensajesPanel
+ * - ADMIN: elimina definitivamente (DELETE backend).
+ * - TESORERO / SOCIO: "eliminar" solo oculta localmente (localStorage) — no toca backend.
+ * - Botón eliminar: mismo diseño para todos.
+ * - Crear mensaje: solo ADMIN y TESORERO.
+ *
+ * NOTE: Ya no hay ningún botón ni enlace para "restaurar" mensajes ocultos.
+ */
+
+const HIDDEN_KEY_PREFIX = 'mensajes_hidden_'; // + userType (ej. mensajes_hidden_SOCIO)
+
 const MensajesPanel = ({ userType }) => {
-    const [mensajes, setMensajes] = useState([]);
-    const [mostrarForm, setMostrarForm] = useState(false);
-    const [nuevoMensaje, setNuevoMensaje] = useState({
+  const [mensajes, setMensajes] = useState([]);
+  const [mostrarForm, setMostrarForm] = useState(false);
+  const [nuevoMensaje, setNuevoMensaje] = useState({
+    asunto: '',
+    mensaje: '',
+    destinatario_tipo: userType === 'ADMIN' ? 'TESORERO' : 'ADMIN'
+  });
+
+  const listaRef = useRef(null);
+  const hiddenKey = `${HIDDEN_KEY_PREFIX}${userType}`;
+
+  // helpers para ocultos en localStorage
+  const loadHiddenIds = () => {
+    try {
+      const raw = localStorage.getItem(hiddenKey);
+      if (!raw) return new Set();
+      const arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) return new Set();
+      return new Set(arr);
+    } catch (e) {
+      console.warn('Error leyendo hidden ids:', e);
+      return new Set();
+    }
+  };
+
+  const saveHiddenIds = (setIds) => {
+    try {
+      const arr = Array.from(setIds);
+      localStorage.setItem(hiddenKey, JSON.stringify(arr));
+    } catch (e) {
+      console.warn('Error guardando hidden ids:', e);
+    }
+  };
+
+  // cargar mensajes y filtrar los ocultos locales
+  const cargarMensajes = async () => {
+    try {
+      const response = await mensajesService.getMensajes(userType);
+      const data = Array.isArray(response.data) ? response.data : (response.data.results || []);
+      const hidden = loadHiddenIds();
+      const visibles = data.filter(m => !(m && hidden.has(m.id)));
+      setMensajes(visibles);
+    } catch (error) {
+      console.error('❌ Error cargando mensajes:', error);
+      setMensajes([]);
+    }
+  };
+
+  useEffect(() => {
+    cargarMensajes();
+    const interval = setInterval(cargarMensajes, 30000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userType]);
+
+  // scroll automático al final
+  useEffect(() => {
+    if (!listaRef.current) return;
+    listaRef.current.scrollTop = listaRef.current.scrollHeight;
+  }, [mensajes]);
+
+  // enviar mensaje (optimista)
+  const enviarMensaje = async (e) => {
+    e.preventDefault();
+    try {
+      const resp = await mensajesService.createMensaje({
+        ...nuevoMensaje,
+        emisor_tipo: userType
+      });
+
+      if (resp && resp.data) {
+        setMensajes(prev => [...prev, resp.data]);
+      } else {
+        const temp = {
+          id: `temp-${Date.now()}`,
+          asunto: nuevoMensaje.asunto,
+          mensaje: nuevoMensaje.mensaje,
+          emisor_tipo: userType,
+          creado_en: new Date().toISOString(),
+          leido: false
+        };
+        setMensajes(prev => [...prev, temp]);
+      }
+
+      setNuevoMensaje({
         asunto: '',
         mensaje: '',
         destinatario_tipo: userType === 'ADMIN' ? 'TESORERO' : 'ADMIN'
-    });
+      });
+      setMostrarForm(false);
+    } catch (error) {
+      console.error('❌ Error enviando mensaje:', error);
+      alert('Error enviando mensaje. Revisa la consola.');
+    }
+  };
 
-    const cargarMensajes = async () => {
-        try {
-            const response = await mensajesService.getMensajes(userType);
-            setMensajes(response.data);
-        } catch (error) {
-            console.error('❌ Error cargando mensajes:', error);
-        }
-    };
+  /**
+   * borrarMensaje:
+   * - ADMIN: elimina en backend (definitivo).
+   * - TESORERO / SOCIO: oculta localmente (no backend).
+   */
+  const borrarMensaje = async (id) => {
+    const confirmacion = window.confirm('¿Seguro que quieres eliminar este mensaje?');
+    if (!confirmacion) return;
 
-    const enviarMensaje = async (e) => {
-        e.preventDefault();
-        try {
-            await mensajesService.createMensaje({
-                ...nuevoMensaje,
-                emisor_tipo: userType
-            });
-            
-            setNuevoMensaje({ 
-                asunto: '', 
-                mensaje: '', 
-                destinatario_tipo: userType === 'ADMIN' ? 'TESORERO' : 'ADMIN' 
-            });
-            setMostrarForm(false);
-            cargarMensajes();
-        } catch (error) {
-            console.error('❌ Error enviando mensaje:', error);
-        }
-    };
+    if (userType === 'TESORERO' || userType === 'SOCIO') {
+      // ocultar local sin tocar backend
+      try {
+        setMensajes(prev => prev.filter(m => m.id !== id));
+        const hidden = loadHiddenIds();
+        hidden.add(id);
+        saveHiddenIds(hidden);
+      } catch (e) {
+        console.error('Error ocultando mensaje localmente:', e);
+      }
+      return;
+    }
 
-    useEffect(() => {
-        cargarMensajes();
-        const interval = setInterval(cargarMensajes, 30000);
-        return () => clearInterval(interval);
-    }, [userType]);
+    // ADMIN: eliminar en backend
+    try {
+      setMensajes(prev => prev.filter(m => m.id !== id));
+      await mensajesService.deleteMensaje(id);
+    } catch (error) {
+      console.error('❌ Error eliminando mensaje (backend):', error);
+      await cargarMensajes();
+    }
+  };
 
-    return (
-        <div style={{
-            background: 'white', 
-            padding: '15px', 
-            borderRadius: '8px', 
-            margin: '10px 0', 
-            border: '1px solid #ddd',
-            width: '400px', // ✅ ANCHO FIJO
-            maxHeight: '500px', // ✅ ALTURA MÁXIMA
-            display: 'flex',
-            flexDirection: 'column'
-        }}>
-            {/* HEADER */}
-            <div style={{
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
-                marginBottom: '15px',
-                flexShrink: 0 // ✅ NO SE ENCOGE
-            }}>
-                <h3 style={{margin: 0, color: '#333', fontSize: '16px'}}>Bandeja de Mensajes</h3>
-                <button 
-                    style={{
-                        background: '#3B82F6', 
-                        color: 'white', 
-                        border: 'none', 
-                        padding: '6px 12px', 
-                        borderRadius: '4px', 
-                        cursor: 'pointer',
-                        fontSize: '12px'
-                    }}
-                    onClick={() => setMostrarForm(!mostrarForm)}
-                >
-                    Nuevo
-                </button>
+  // permisos
+  const puedeCrear = userType === 'ADMIN' || userType === 'TESORERO';
+  const puedeEliminar = true; // todos ven el botón, la acción depende del role
+
+  // estilo del botón eliminar (22x22)
+  const deleteBtnBase = {
+    position: 'absolute',
+    top: '6px',
+    right: '6px',
+    width: '22px',
+    height: '22px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '999px',
+    border: 'none',
+    cursor: 'pointer',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
+    transition: 'transform 120ms ease, box-shadow 120ms ease',
+    background: '#ef4444',
+    color: 'white',
+    fontSize: '12px',
+    lineHeight: 1,
+    padding: 0
+  };
+
+  const deleteBtnHover = {
+    background: '#dc2626',
+    transform: 'scale(1.05)',
+    boxShadow: '0 2px 6px rgba(0,0,0,0.16)'
+  };
+
+  return (
+    <div style={{
+      background: 'white',
+      padding: '12px',
+      borderRadius: '8px',
+      margin: '10px 0',
+      border: '1px solid #ddd',
+      width: '100%',
+      maxWidth: '400px',
+      maxHeight: '500px',
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+        <h3 style={{ margin: 0, color: '#333', fontSize: '16px' }}>Tablón de Mensajes</h3>
+        {puedeCrear && (
+          <button onClick={() => setMostrarForm(!mostrarForm)} style={{ background: '#3B82F6', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer' }}>
+            Nuevo
+          </button>
+        )}
+      </div>
+
+      {/* Formulario (solo ADMIN/TESORERO) */}
+      {puedeCrear && mostrarForm && (
+        <div style={{ background: '#f9fafb', padding: '10px', borderRadius: '6px', marginBottom: '12px' }}>
+          <form onSubmit={enviarMensaje}>
+            <input type="text" placeholder="Asunto" value={nuevoMensaje.asunto} onChange={(e) => setNuevoMensaje({ ...nuevoMensaje, asunto: e.target.value })} style={{ width: '100%', padding: '8px', marginBottom: '8px' }} required />
+            <textarea placeholder="Mensaje" value={nuevoMensaje.mensaje} onChange={(e) => setNuevoMensaje({ ...nuevoMensaje, mensaje: e.target.value })} style={{ width: '100%', padding: '8px', marginBottom: '8px' }} required />
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button type="submit" style={{ flex: 1, background: '#10B981', color: 'white', border: 'none', padding: '8px', borderRadius: '4px' }}>Enviar</button>
+              <button type="button" onClick={() => setMostrarForm(false)} style={{ flex: 1, background: '#6B7280', color: 'white', border: 'none', padding: '8px', borderRadius: '4px' }}>Cancelar</button>
             </div>
-
-            {/* FORMULARIO */}
-            {mostrarForm && (
-                <div style={{
-                    background: '#f9fafb', 
-                    padding: '12px', 
-                    borderRadius: '6px', 
-                    marginBottom: '15px',
-                    flexShrink: 0 
-                }}>
-                    <form onSubmit={enviarMensaje}>
-                        <div style={{marginBottom: '10px'}}>
-                            <input
-                                type="text"
-                                placeholder="Asunto"
-                                value={nuevoMensaje.asunto}
-                                onChange={(e) => setNuevoMensaje({...nuevoMensaje, asunto: e.target.value})}
-                                style={{
-                                    width: '100%', 
-                                    padding: '8px', 
-                                    border: '1px solid #ccc', 
-                                    borderRadius: '4px',
-                                    fontSize: '12px'
-                                }}
-                                required
-                            />
-                        </div>
-                        
-                        <div style={{marginBottom: '10px'}}>
-                            <textarea
-                                placeholder="Escribe tu mensaje..."
-                                value={nuevoMensaje.mensaje}
-                                onChange={(e) => setNuevoMensaje({...nuevoMensaje, mensaje: e.target.value})}
-                                style={{
-                                    width: '100%', 
-                                    padding: '8px', 
-                                    border: '1px solid #ccc', 
-                                    borderRadius: '4px', 
-                                    height: '60px',
-                                    fontSize: '12px'
-                                }}
-                                required
-                            />
-                        </div>
-
-                        <div style={{display: 'flex', gap: '8px'}}>
-                            <button type="submit" style={{
-                                background: '#10B981', 
-                                color: 'white', 
-                                border: 'none', 
-                                padding: '6px 12px', 
-                                borderRadius: '4px', 
-                                cursor: 'pointer', 
-                                flex: 1,
-                                fontSize: '12px'
-                            }}>
-                                Enviar
-                            </button>
-                            <button 
-                                type="button" 
-                                onClick={() => setMostrarForm(false)}
-                                style={{
-                                    background: '#6B7280', 
-                                    color: 'white', 
-                                    border: 'none', 
-                                    padding: '6px 12px', 
-                                    borderRadius: '4px', 
-                                    cursor: 'pointer', 
-                                    flex: 1,
-                                    fontSize: '12px'
-                                }}
-                            >
-                                Cancelar
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            )}
-
-            {/* LISTA DE MENSAJES CON SCROLL */}
-            <div style={{
-                flex: 1, // ✅ OCUPA EL ESPACIO RESTANTE
-                overflowY: 'auto', // ✅ SCROLL VERTICAL
-                minHeight: '200px' // ✅ ALTURA MÍNIMA
-            }}>
-                <h4 style={{
-                    marginBottom: '10px', 
-                    color: '#555', 
-                    fontSize: '14px',
-                    flexShrink: 0
-                }}>
-                    Mensajes:
-                </h4>
-                
-                {mensajes.length === 0 ? (
-                    <p style={{
-                        textAlign: 'center', 
-                        color: '#666', 
-                        fontStyle: 'italic',
-                        fontSize: '12px',
-                        padding: '20px 0'
-                    }}>
-                        No hay mensajes aún
-                    </p>
-                ) : (
-                    <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '8px'
-                    }}>
-                        {mensajes.map(mensaje => (
-                            <div key={mensaje.id} style={{
-                                background: mensaje.emisor_tipo === userType ? '#EFF6FF' : '#F0FDF4',
-                                borderLeft: `3px solid ${mensaje.emisor_tipo === userType ? '#3B82F6' : '#10B981'}`,
-                                padding: '10px',
-                                borderRadius: '4px',
-                                fontSize: '12px'
-                            }}>
-                                <div style={{
-                                    display: 'flex', 
-                                    justifyContent: 'space-between', 
-                                    marginBottom: '5px'
-                                }}>
-                                    <strong style={{fontSize: '11px'}}>
-                                        {mensaje.emisor_tipo === userType ? '👤 Tú' : `👤 ${mensaje.emisor_tipo}`}
-                                    </strong>
-                                    <span style={{
-                                        color: '#666', 
-                                        fontSize: '10px'
-                                    }}>
-                                        {new Date(mensaje.creado_en).toLocaleTimeString('es-ES', { 
-                                            hour: '2-digit', 
-                                            minute: '2-digit' 
-                                        })}
-                                    </span>
-                                </div>
-                                <h5 style={{
-                                    margin: '3px 0', 
-                                    color: '#333', 
-                                    fontSize: '11px',
-                                    fontWeight: 'bold'
-                                }}>
-                                    {mensaje.asunto}
-                                </h5>
-                                <p style={{
-                                    margin: 0, 
-                                    color: '#555', 
-                                    fontSize: '11px',
-                                    lineHeight: '1.3'
-                                }}>
-                                    {mensaje.mensaje.length > 80 
-                                        ? `${mensaje.mensaje.substring(0, 80)}...` 
-                                        : mensaje.mensaje
-                                    }
-                                </p>
-                                {!mensaje.leido && mensaje.emisor_tipo !== userType && (
-                                    <span style={{
-                                        background: '#EF4444', 
-                                        color: 'white', 
-                                        padding: '1px 6px', 
-                                        borderRadius: '8px', 
-                                        fontSize: '9px', 
-                                        marginTop: '3px', 
-                                        display: 'inline-block'
-                                    }}>
-                                        NUEVO
-                                    </span>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
+          </form>
         </div>
-    );
+      )}
+
+      {/* Lista */}
+      <div ref={listaRef} style={{ flex: 1, overflowY: 'auto', minHeight: '200px' }}>
+        <h4 style={{ marginBottom: '10px', color: '#555', fontSize: '14px' }}>Mensajes:</h4>
+
+        {mensajes.length === 0 ? (
+          <p style={{ textAlign: 'center', color: '#666', fontStyle: 'italic', fontSize: '12px', padding: '20px 0' }}>No hay mensajes aún</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {mensajes.map(mensaje => {
+              const creado = mensaje && mensaje.creado_en ? new Date(mensaje.creado_en) : null;
+              const hora = creado ? creado.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '';
+              const texto = mensaje && mensaje.mensaje ? mensaje.mensaje : '';
+
+              return (
+                <div key={mensaje.id || `${mensaje.asunto}-${Math.random()}`} style={{
+                  background: mensaje.emisor_tipo === userType ? '#EFF6FF' : '#F0FDF4',
+                  borderLeft: `3px solid ${mensaje.emisor_tipo === userType ? '#3B82F6' : '#10B981'}`,
+                  padding: '10px',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  position: 'relative'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                    <strong style={{ fontSize: '11px' }}>{mensaje.emisor_tipo === userType ? '👤 Tú' : `👤 ${mensaje.emisor_tipo}`}</strong>
+                    <span style={{ color: '#666', fontSize: '10px', paddingRight: '36px' }}>{hora}</span>
+                  </div>
+
+                  <h5 style={{ margin: '3px 0', color: '#333', fontSize: '11px', fontWeight: 'bold' }}>{mensaje.asunto}</h5>
+
+                  <p style={{ margin: 0, color: '#555', fontSize: '11px', lineHeight: '1.3' }}>{texto.length > 80 ? `${texto.substring(0, 80)}...` : texto}</p>
+
+                  {puedeEliminar && (
+                    <button onClick={() => borrarMensaje(mensaje.id)} title="Eliminar mensaje" aria-label={`Eliminar mensaje ${mensaje.asunto || ''}`} style={deleteBtnBase} onMouseEnter={(e) => Object.assign(e.currentTarget.style, deleteBtnHover)} onMouseLeave={(e) => Object.assign(e.currentTarget.style, deleteBtnBase)}>✕</button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };
 
 export default MensajesPanel;
