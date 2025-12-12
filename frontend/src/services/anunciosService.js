@@ -1,5 +1,5 @@
 const API_URL = "http://127.0.0.1:8000/api/anuncios/";
-
+import axios from 'axios';
 // Función para obtener el token
 function getAuthToken() {
     const tokens = localStorage.getItem('authTokens');
@@ -84,3 +84,14 @@ export async function updateAnuncio(id, anuncio) {
 
     return await response.json();
 }
+
+// Función nueva para obtener UN solo anuncio
+export const getAnuncioById = async (id) => {
+    try {
+        const response = await axios.get(`http://127.0.0.1:8000/api/anuncios/${id}/`); 
+        return response.data;
+    } catch (error) {
+        console.error("Error al obtener el anuncio:", error);
+        throw error;
+    }
+};

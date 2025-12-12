@@ -20,7 +20,6 @@ function App() {
     <div style={bgImagen} className="relative">
       <Navbar />
       <Hero />
-      <TrabajoLocal />
       <LandingAnuncios />
       <Contacto />
 

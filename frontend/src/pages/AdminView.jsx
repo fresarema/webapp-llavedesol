@@ -8,10 +8,14 @@ import Calendario from "../components/Calendario/Calendario";
 import Fondo from "../assets/fondo.png";
 import Logo from "../assets/Logo.png";
 
+
 function AdminView() {
     const { user, logoutUser } = useAuth();
 
     const [anuncios, setAnuncios] = useState([]);
+    // Paginación para Anuncios
+    const [paginaAnuncios, setPaginaAnuncios] = useState(1);
+    const anunciosPorPagina = 4;
     const [librosCuentas, setLibrosCuentas] = useState([]);
     const [mensajesContacto, setMensajesContacto] = useState([]);
     const [eventosCalendario, setEventosCalendario] = useState([]);
@@ -420,27 +424,51 @@ function AdminView() {
     const handleGuardar = async (e) => {
         e.preventDefault();
 
-        const anuncioData = {
-            titulo: titulo.trim(),
-            descripcion: descripcion.trim(),
-            imagen: imagen.trim() || null
-        };
+        // Usamos FormData en lugar de un objeto JSON simple
+        const formData = new FormData();
+        formData.append('titulo', titulo.trim());
+        formData.append('descripcion', descripcion.trim());
+        
+        // Solo agregamos la imagen si el usuario seleccionó un archivo nuevo
+        // (Si es un string, significa que es la URL vieja y no la tocamos, o el backend la maneja)
+        if (imagen instanceof File) {
+            formData.append('imagen', imagen);
+        }
 
         try {
+            let config = {
+                headers: { 'Content-Type': 'multipart/form-data' } // Importante para archivos
+            };
+
+            // Si necesitamos token (que seguro sí), lo agregamos aquí
+            const authTokens = JSON.parse(localStorage.getItem('authTokens'));
+            if (authTokens?.access) {
+                config.headers['Authorization'] = `Bearer ${authTokens.access}`;
+            }
+
             if (editandoId) {
-                const anuncioActualizado = await updateAnuncio(editandoId, anuncioData);
-                setAnuncios(anuncios.map(a => a.id === editandoId ? anuncioActualizado : a));
-                alert("✅ Anuncio actualizado correctamente");
+                const response = await axios.patch( // Usamos PATCH para actualizar parcialmente
+                    `http://127.0.0.1:8000/api/anuncios/${editandoId}/`,
+                    formData,
+                    config
+                );
+                // Actualizamos la lista local
+                setAnuncios(anuncios.map(a => a.id === editandoId ? response.data : a));
+                alert("✅ Noticia actualizada correctamente");
             } else {
-                const nuevoAnuncio = await createAnuncio(anuncioData);
-                setAnuncios([...anuncios, nuevoAnuncio]);
-                alert("✅ Anuncio creado correctamente");
+                const response = await axios.post(
+                    'http://127.0.0.1:8000/api/anuncios/',
+                    formData,
+                    config
+                );
+                setAnuncios([...anuncios, response.data]);
+                alert("✅ Noticia creada correctamente");
             }
 
             cancelarForm();
         } catch (error) {
             console.error("Error al guardar:", error);
-            alert("❌ Error al guardar el anuncio.");
+            alert("❌ Error al guardar la noticia.");
         }
     };
 
@@ -549,179 +577,199 @@ function AdminView() {
         }
     };
 
-    const renderAnuncios = () => (
-        <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold">Anuncios actuales</h2>
-                {!mostrarForm && (
-                    <button
-                        onClick={() => setMostrarForm(true)}
-                        className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg font-medium transition duration-300"
-                    >
-                        + Crear Nuevo Anuncio
-                    </button>
-                )}
-            </div>
+    const renderAnuncios = () => {
+        // 1. Ordenar: Lo más nuevo primero
+        const anunciosOrdenados = [...anuncios].sort((a, b) => {
+            return new Date(b.creado_en) - new Date(a.creado_en);
+        });
 
-            {anuncios.length === 0 ? (
-                <div className="p-8 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 text-center">
-                    <p className="text-lg">No hay anuncios creados aún.</p>
-                    <button
-                        onClick={() => setMostrarForm(true)}
-                        className="mt-4 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg font-medium transition duration-300"
-                    >
-                        Crear primer anuncio
-                    </button>
+        // 2. Lógica de Paginación
+        const indiceUltimo = paginaAnuncios * anunciosPorPagina;
+        const indicePrimero = indiceUltimo - anunciosPorPagina;
+        const anunciosVisibles = anunciosOrdenados.slice(indicePrimero, indiceUltimo);
+        const totalPaginasAnuncios = Math.ceil(anunciosOrdenados.length / anunciosPorPagina);
+
+        return (
+            <div className="bg-white rounded-lg shadow-md p-6">
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-2xl font-bold text-gray-800">
+                        Noticias ({anuncios.length})
+                    </h2>
+                    {!mostrarForm && (
+                        <button
+                            onClick={() => setMostrarForm(true)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-medium transition duration-300 flex items-center gap-2 shadow-sm"
+                        >
+                            <span>➕</span> Crear Nueva Noticia
+                        </button>
+                    )}
                 </div>
-            ) : (
-                <div className="grid gap-4">
-                    {anuncios.map((a) => (
-                        <div key={a.id} className="border border-gray-200 p-4 rounded-lg bg-white hover:bg-gray-50 transition duration-200">
-                            <div className="flex gap-4">
-                                {a.imagen && (
-                                    <div className="flex-shrink-0">
-                                        <div className="w-24 h-24 rounded-lg overflow-hidden">
-                                            <img 
-                                                src={a.imagen} 
-                                                alt={a.titulo}
-                                                className="w-full h-full object-cover"
-                                            />
+
+                {anuncios.length === 0 ? (
+                    <div className="p-10 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 text-center bg-gray-50">
+                        <p className="text-lg mb-2">No hay noticias creadas aún.</p>
+                        <button
+                            onClick={() => setMostrarForm(true)}
+                            className="mt-2 text-blue-600 font-semibold hover:underline"
+                        >
+                            Crear la primera noticia
+                        </button>
+                    </div>
+                ) : (
+                    <>
+                        <div className="grid gap-4">
+                            {anunciosVisibles.map((a) => (
+                                <div key={a.id} className="border border-gray-200 p-4 rounded-lg bg-white hover:bg-gray-50 transition duration-200 shadow-sm flex flex-col sm:flex-row gap-4">
+                                    {/* Miniatura de la imagen */}
+                                    {a.imagen && (
+                                        <div className="flex-shrink-0">
+                                            <div className="w-full sm:w-32 h-32 rounded-md overflow-hidden bg-gray-100 border border-gray-200">
+                                                <img 
+                                                    src={a.imagen} 
+                                                    alt={a.titulo}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
-                                
-                                <div className="flex-1">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <strong className="text-xl block text-gray-800">{a.titulo}</strong>
-                                        <div className="flex gap-2 ml-4">
+                                    )}
+                                    
+                                    <div className="flex-1 flex flex-col justify-between">
+                                        <div>
+                                            <div className="flex justify-between items-start mb-1">
+                                                <h3 className="text-lg font-bold text-gray-800 line-clamp-1">{a.titulo}</h3>
+                                                <span className="text-xs font-medium text-gray-400 whitespace-nowrap ml-2">
+                                                    {formatearFecha(a.creado_en)}
+                                                </span>
+                                            </div>
+                                            <p className="text-gray-600 text-sm mb-3 line-clamp-2">{a.descripcion}</p>
+                                        </div>
+                                        
+                                        <div className="flex gap-2 justify-end sm:justify-start">
                                             <button
                                                 onClick={() => iniciarEdicion(a)}
-                                                className="bg-blue-500 hover:bg-blue-600 text-white py-1 px-3 rounded text-sm transition duration-300"
+                                                className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded text-sm font-medium hover:bg-indigo-100 transition"
                                             >
-                                                Editar
+                                                ✏️ Editar
                                             </button>
                                             <button
                                                 onClick={() => handleEliminar(a.id, a.titulo)}
-                                                className="bg-red-500 hover:bg-red-600 text-white py-1 px-3 rounded text-sm transition duration-300"
+                                                className="px-3 py-1.5 bg-red-50 text-red-600 rounded text-sm font-medium hover:bg-red-100 transition"
                                             >
-                                                Eliminar
+                                                🗑️ Eliminar
                                             </button>
                                         </div>
                                     </div>
-                                    <p className="text-gray-600 mb-2">{a.descripcion}</p>
-                                    
-                                    <div className="text-xs text-gray-500">
-                                        <p>Creado: {formatearFecha(a.creado_en)}</p>
-                                    </div>
                                 </div>
-                            </div>
+                            ))}
                         </div>
-                    ))}
-                </div>
-            )}
 
-            {mostrarForm && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-xl overflow-hidden">
-                        <div className="bg-gray-100 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                            <h3 className="text-xl font-bold text-gray-800">
-                                {editandoId ? '✏️ Editar Anuncio' : '➕ Crear Nuevo Anuncio'}
-                            </h3>
-                            <button 
-                                onClick={cancelarForm}
-                                className="text-gray-500 hover:text-gray-700 font-bold text-xl"
-                            >
-                                &times;
-                            </button>
-                        </div>
-                        
-                        <div className="max-h-[70vh] overflow-y-auto">
-                            <form onSubmit={handleGuardar}>
-                                <div className="p-6 space-y-6">
-                                    <div>
-                                        <label className="block mb-2">
-                                            <span className="block text-sm font-semibold text-gray-700 mb-2">Título:</span>
+                        {/* CONTROLES DE PAGINACIÓN */}
+                        {totalPaginasAnuncios > 1 && (
+                            <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-100">
+                                <button 
+                                    onClick={() => setPaginaAnuncios(prev => Math.max(prev - 1, 1))}
+                                    disabled={paginaAnuncios === 1}
+                                    className="px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:text-gray-300 disabled:cursor-not-allowed text-gray-700 hover:bg-gray-100 bg-white border border-gray-200"
+                                >
+                                    ← Anterior
+                                </button>
+                                <span className="text-sm text-gray-600 font-medium">
+                                    Página {paginaAnuncios} de {totalPaginasAnuncios}
+                                </span>
+                                <button 
+                                    onClick={() => setPaginaAnuncios(prev => Math.min(prev + 1, totalPaginasAnuncios))}
+                                    disabled={paginaAnuncios === totalPaginasAnuncios}
+                                    className="px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:text-gray-300 disabled:cursor-not-allowed text-gray-700 hover:bg-gray-100 bg-white border border-gray-200"
+                                >
+                                    Siguiente →
+                                </button>
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {/* ================================================================= */}
+                {/* ¡AQUÍ ESTÁ LA PARTE QUE FALTABA! EL MODAL DE CREACIÓN/EDICIÓN */}
+                {/* ================================================================= */}
+                {mostrarForm && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-lg shadow-xl w-full max-w-xl overflow-hidden">
+                            <div className="bg-gray-100 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                                <h3 className="text-xl font-bold text-gray-800">
+                                    {editandoId ? '✏️ Editar Noticia' : '➕ Crear Nueva Noticia'}
+                                </h3>
+                                <button onClick={cancelarForm} className="text-gray-500 hover:text-gray-700 font-bold text-xl">&times;</button>
+                            </div>
+                            
+                            <div className="max-h-[70vh] overflow-y-auto">
+                                <form onSubmit={handleGuardar}>
+                                    <div className="p-6 space-y-6">
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">Título:</label>
                                             <input
                                                 className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                 value={titulo}
                                                 onChange={(e) => setTitulo(e.target.value)}
-                                                placeholder="Escribe el título del anuncio"
+                                                placeholder="Título de la noticia"
                                                 required
                                             />
-                                        </label>
-                                    </div>
+                                        </div>
 
-                                    <div>
-                                        <label className="block mb-2">
-                                            <span className="block text-sm font-semibold text-gray-700 mb-2">Descripción:</span>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">Descripción:</label>
                                             <textarea
                                                 className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                 rows="4"
                                                 value={descripcion}
                                                 onChange={(e) => setDescripcion(e.target.value)}
-                                                placeholder="Describe el contenido del anuncio"
+                                                placeholder="Contenido de la noticia..."
+                                                required
                                             />
-                                        </label>
-                                    </div>
+                                        </div>
 
-                                    <div>
-                                        <label className="block mb-2">
-                                            <span className="block text-sm font-semibold text-gray-700 mb-2">URL de Imagen (opcional):</span>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">Imagen de portada:</label>
                                             <input
-                                                type="url"
-                                                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                value={imagen}
-                                                onChange={(e) => setImagen(e.target.value)}
-                                                placeholder="https://ejemplo.com/imagen.jpg"
+                                                type="file"
+                                                accept="image/*"
+                                                className="w-full p-2 border border-gray-300 rounded-lg text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                                onChange={(e) => {
+                                                    if (e.target.files[0]) {
+                                                        setImagen(e.target.files[0]);
+                                                    }
+                                                }}
                                             />
-                                            <p className="text-xs text-gray-500 mt-2">
-                                                Inserta la URL de una imagen para mostrar en el anuncio
-                                            </p>
-                                        </label>
-                                    </div>
+                                            <p className="text-xs text-gray-500 mt-2">Formatos: JPG, PNG, WEBP.</p>
+                                        </div>
 
-                                    {imagen && (
-                                        <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-                                            <p className="text-sm font-medium text-gray-700 mb-2">Vista previa:</p>
-                                            <div className="flex justify-center">
-                                                <div className="w-40 h-40 rounded-lg overflow-hidden border">
+                                        {imagen && (
+                                            <div className="p-4 border border-gray-200 rounded-lg bg-gray-50 flex flex-col items-center">
+                                                <p className="text-sm font-medium text-gray-700 mb-2">Vista previa:</p>
+                                                <div className="w-40 h-40 rounded-lg overflow-hidden border bg-white">
                                                     <img 
-                                                        src={imagen} 
+                                                        src={imagen instanceof File ? URL.createObjectURL(imagen) : imagen} 
                                                         alt="Vista previa" 
                                                         className="w-full h-full object-cover"
-                                                        onError={(e) => {
-                                                            e.target.onerror = null;
-                                                            e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik00IDE2VjRDMTQgMTAgMjAgMTYgMjAgMTZINDBaTTQgMTZIOCIgc3Ryb2tlPSIjOWNhMGI4IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxwYXRoIGQ9Ik0yMCA0SDRDMy40NDc3MiA0IDMgNC40NDc3MiAzIDVWMTlDMi45OTk5NiAxOS41NTIyIDMuNDQ3NjggMjAgNCAyMEgyMEMyMC41NTIzIDIwIDIxIDE5LjU1MjMgMjEgMTlWNUMxOS45OTk5IDQuNDQ3NzIgMTkuNTUyMyA0IDE5IDRaIiBzdHJva2U9IiM5Y2EwYjgiIHN0cm9rZS13aWR0aD0iIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48L3N2Zz4=';
-                                                        }}
                                                     />
                                                 </div>
                                             </div>
-                                        </div>
-                                    )}
-                                </div>
+                                        )}
+                                    </div>
 
-                                <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
-                                    <button
-                                        type="button"
-                                        onClick={cancelarForm}
-                                        className="bg-gray-500 hover:bg-gray-600 text-white py-2 px-6 rounded-lg font-medium transition duration-300"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="bg-green-500 hover:bg-green-600 text-white py-2 px-6 rounded-lg font-medium transition duration-300"
-                                    >
-                                        {editandoId ? 'Actualizar anuncio' : 'Guardar anuncio'}
-                                    </button>
-                                </div>
-                            </form>
+                                    <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+                                        <button type="button" onClick={cancelarForm} className="bg-gray-500 hover:bg-gray-600 text-white py-2 px-6 rounded-lg font-medium transition">Cancelar</button>
+                                        <button type="submit" className="bg-green-500 hover:bg-green-600 text-white py-2 px-6 rounded-lg font-medium transition">
+                                            {editandoId ? 'Actualizar' : 'Publicar'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
-    );
+                )}
+            </div>
+        );
+    };
 
     const renderLibros = () => (
         <div className="bg-white rounded-lg shadow-md p-6">

@@ -24,7 +24,7 @@ const instagramPosts = [
 function TrabajoLocal() {
   return (
     // El 'id' es CLAVE para que el enlace de la navbar funcione
-    <section id="trabajo-local" className="py-20 px-4">
+    <section id="trabajoo" className="py-20 px-4">
       <div className="container mx-auto text-center">
         
         <h2 className="text-4xl font-bold mb-4 text-gray-800">Nuestro Trabajo Local</h2>

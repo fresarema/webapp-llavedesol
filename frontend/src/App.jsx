@@ -11,6 +11,7 @@ import SocioView from './pages/SocioView'; // ← NUEVO IMPORT
 import ProtectedRoute from './utils/ProtectedRoute';
 import Donaciones from './components/Donaciones/mercado-pago';
 import FormularioAdmision from './components/FormularioAdmision/FormularioAdmision';
+import DetalleAnuncio from './pages/DetalleAnuncio';
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/donaciones" element={<Donaciones />} />
         <Route path="/unete" element={<FormularioAdmision />} />
+        <Route path="/anuncio/:id" element={<DetalleAnuncio />} />
 
         {/* Rutas Protegidas */}
         <Route 

@@ -13,7 +13,8 @@ from .views import (
     ActualizarSolicitudView,
     EventoCalendarioViewSet,
     aprobar_solicitud_con_usuario,
-    cambiar_password  # <-- IMPORTAR LA NUEVA VISTA
+    cambiar_password,
+    DetalleAnuncioView
 )
 
 router = DefaultRouter()
@@ -29,6 +30,9 @@ urlpatterns = [
     
     # Rutas del router
     path('', include(router.urls)),
+
+    # Ruta para poder ver un anuncio en una pagina nueva
+    path('anuncios/<int:pk>/', DetalleAnuncioView.as_view(), name='detalle_anuncio'),
     
     # Solicitudes de ingreso
     path('solicitud-ingreso/', CrearSolicitudView.as_view(), name='crear_solicitud'),

@@ -66,6 +66,11 @@ class AnuncioViewSet(viewsets.ModelViewSet):
     serializer_class = AnuncioSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
+class DetalleAnuncioView(generics.RetrieveAPIView):
+    queryset = Anuncio.objects.all()
+    serializer_class = AnuncioSerializer
+    permission_classes = [AllowAny]
+
 class LibroCuentaViewSet(viewsets.ModelViewSet):
     queryset = LibroCuenta.objects.all()
     serializer_class = LibroCuentaSerializer

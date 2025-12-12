@@ -145,7 +145,7 @@ class SolicitudIngreso(models.Model):
 class Anuncio(models.Model):
     titulo = models.CharField(max_length=200)
     descripcion = models.TextField()
-    imagen = models.URLField(blank=True, null=True)
+    imagen = models.ImageField(upload_to='anuncios/', blank=True, null=True)
     creado_en = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
