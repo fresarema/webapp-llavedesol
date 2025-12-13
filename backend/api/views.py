@@ -11,6 +11,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone 
 from django.utils.crypto import get_random_string
 import json
+import csv
 import decimal
 import traceback
 import django.db.utils
@@ -18,10 +19,11 @@ from django.db import transaction
 from django.contrib.auth.models import User, Group
 from django.contrib.auth import update_session_auth_hash
 
+
 # --- Dependencias ---
 from .models import Anuncio, LibroCuenta, Mensaje, Contacto, Donacion, SolicitudIngreso, EventoCalendario
 from .serializers import AnuncioSerializer, LibroCuentaSerializer, MensajeSerializer, ContactoSerializer, DonacionSerializer, SolicitudIngresoSerializer, EventoCalendarioSerializer
-
+from .pagination import DonacionPageNumberPagination
 # --- SDK de Mercado Pago (Python) ---
 import mercadopago
 
@@ -113,7 +115,21 @@ class EventoCalendarioViewSet(viewsets.ModelViewSet):
     serializer_class = EventoCalendarioSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+# -----------------------------------------------------------------------------------
+# VISTA ESPECIAL PARA DONACIONES
+# -----------------------------------------------------------------------------------
 
+class DonacionViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Vista para ver el historial de donaciones.
+    Solo lectura (ReadOnly) para evitar modificaciones accidentales.
+    Solo accesible para Administradores y Tesoreros.
+    """
+    queryset = Donacion.objects.all().order_by('-fecha_donacion')
+    serializer_class = DonacionSerializer
+    permission_classes = [IsTesoreroOrAdmin]
+    pagination_class = DonacionPageNumberPagination 
+    permission_classes = [IsTesoreroOrAdmin]
 # -----------------------------------------------------------------------------------
 # VISTA ESPECIAL PARA APROBAR Y CREAR USUARIO AUTOMÁTICO (PARA REACT)
 # -----------------------------------------------------------------------------------
@@ -471,4 +487,45 @@ def webhook_mp(request):
             
         return HttpResponse(status=200) 
     
-    return HttpResponse(status=405) # Método no permitido
+    return HttpResponse(status=405)
+
+
+@api_view(['GET'])
+@permission_classes([IsTesoreroOrAdmin])
+def exportar_donaciones_csv(request):
+    """
+    Exporta todos los registros de Donacion a un archivo CSV.
+    """
+
+    fecha_actual = timezone.now().strftime("%Y%m%d_%H%M")
+    nombre_archivo = f"donaciones_exportadas_{fecha_actual}.csv"
+    
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
+
+    writer = csv.writer(response, delimiter=';')
+
+    queryset = Donacion.objects.all().order_by('-fecha_donacion')
+    
+    campos_modelo = [
+        'id', 'monto', 'nombre_donador', 'fecha_donacion', 'estado',
+        'pago_id',
+    ]
+
+    writer.writerow([field.replace('_', ' ').title() for field in campos_modelo])
+
+    for donacion in queryset:
+        row = []
+        for field_name in campos_modelo:
+            value = getattr(donacion, field_name)  
+            if isinstance(value, timezone.datetime):
+                value = value.strftime("%Y-%m-%d %H:%M:%S")
+            elif value is None:
+                value = ""
+                
+            row.append(str(value))
+            
+
+        writer.writerow(row)
+
+    return response

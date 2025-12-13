@@ -9,13 +9,16 @@ from .views import (
     crear_preferencia, 
     webhook_mp,
     CrearSolicitudView,
+    DonacionViewSet,
+    DetalleAnuncioView,
     ListarSolicitudesView,
     ActualizarSolicitudView,
     EventoCalendarioViewSet,
+    exportar_donaciones_csv,
     aprobar_solicitud_con_usuario,
-    cambiar_password,
-    DetalleAnuncioView
+    cambiar_password  # <-- IMPORTAR LA NUEVA VISTA
 )
+
 
 router = DefaultRouter()
 router.register(r'anuncios', AnuncioViewSet, basename='anuncios')
@@ -23,6 +26,7 @@ router.register(r'libros-cuentas', LibroCuentaViewSet, basename='librocuenta')
 router.register(r'mensajes', MensajeViewSet, basename='mensajes')
 router.register(r'contacto', ContactoViewSet)
 router.register(r'eventos-calendario', EventoCalendarioViewSet)
+
 
 urlpatterns = [
     # Autenticación
@@ -52,4 +56,8 @@ urlpatterns = [
     # --------------------------------------------------------
     path('crear-preferencia/', crear_preferencia, name='crear_preferencia'),
     path('webhook-mercadopago/', webhook_mp, name='webhook_mp'),
+
+    # Ruta Exportacion donaciones a excel
+    path('donaciones/exportar/', exportar_donaciones_csv, name='donaciones_exportar'),
+    path('donaciones/', DonacionViewSet.as_view({'get': 'list'}), name='donaciones_list'),
 ]

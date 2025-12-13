@@ -8,6 +8,7 @@ from rest_framework import serializers
 ## -----------------------------------------------------------
 
 class SolicitudIngreso(models.Model):
+    
     ESTADOS = [
         ('PENDIENTE', 'Pendiente'),
         ('APROBADO', 'Aprobado'),
