@@ -7,13 +7,12 @@ import MensajesPanel from "../components/MensajesPanel/MensajesPanel";
 import Calendario from "../components/Calendario/Calendario"; 
 import Fondo from "../assets/fondo.png";
 import Logo from "../assets/Logo.png";
-
+import Swal from 'sweetalert2';
 
 function AdminView() {
     const { user, logoutUser } = useAuth();
 
     const [anuncios, setAnuncios] = useState([]);
-    // Paginación para Anuncios
     const [paginaAnuncios, setPaginaAnuncios] = useState(1);
     const anunciosPorPagina = 4;
     const [librosCuentas, setLibrosCuentas] = useState([]);
@@ -34,15 +33,12 @@ function AdminView() {
     const [paginaActual, setPaginaActual] = useState(1);
     const mensajesPorPagina = 10;
     
-    // NUEVO: Estado para la sección activa
     const [seccionActiva, setSeccionActiva] = useState('anuncios');
     
-    // NUEVOS ESTADOS PARA FILTROS
     const [filtroBusqueda, setFiltroBusqueda] = useState('');
     const [filtroFecha, setFiltroFecha] = useState('');
     const [filtroOrden, setFiltroOrden] = useState('recientes');
 
-    // ESTADOS PARA SOLICITUDES DE INGRESO
     const [paginaSolicitudes, setPaginaSolicitudes] = useState(1);
     const solicitudesPorPagina = 5; 
     const [tabActiva, setTabActiva] = useState('PENDIENTES'); 
@@ -125,10 +121,8 @@ function AdminView() {
                 }
             });
             
-            // ✅ Asegurarse de que los datos tengan contraseña si existe
             const solicitudesConPassword = response.data.map(solicitud => ({
                 ...solicitud,
-                // Si existe password_generada en los datos del backend, incluirla
                 password_generada: solicitud.password_generada || null
             }));
             
@@ -136,8 +130,13 @@ function AdminView() {
         } catch (error) {
             console.error("Error cargando solicitudes de ingreso", error);
             if (error.response?.status === 401) {
-                alert("Tu sesión ha expirado. Por favor, inicia sesión nuevamente.");
-                logoutUser();
+                Swal.fire({
+                    icon: "error",
+                    title: "Sesión expirada",
+                    text: "Tu sesión ha expirado. Por favor, inicia sesión nuevamente."
+                }).then(() => {
+                    logoutUser();
+                });
             }
         } finally {
             setCargandoSolicitudes(false);
@@ -160,23 +159,55 @@ function AdminView() {
                     eventoData,
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
+                Swal.fire({
+                    icon: "success",
+                    title: "Evento actualizado",
+                    text: "El evento del calendario ha sido actualizado correctamente.",
+                    timer: 3000,
+                    timerProgressBar: true,
+                });
             } else {
                 await axios.post(
                     'http://127.0.0.1:8000/api/eventos-calendario/',
                     eventoData,
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
+                Swal.fire({
+                    icon: "success",
+                    title: "Evento creado",
+                    text: "El evento ha sido añadido al calendario correctamente.",
+                    timer: 3000,
+                    timerProgressBar: true,
+                });
             }
             
             cargarEventosCalendario();
             return true;
         } catch (error) {
             console.error("Error guardando evento:", error.response?.data || error.message);
+            Swal.fire({
+                icon: "error",
+                title: "Error",
+                text: "No se pudo guardar el evento. Verifica los datos.",
+            });
             throw error;
         }
     };
 
     const eliminarEventoCalendario = async (id) => {
+        const result = await Swal.fire({
+            title: "¿Eliminar evento?",
+            text: "Esta acción no se puede deshacer.",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#3085d6",
+            cancelButtonColor: "#d33",
+            confirmButtonText: "Sí, eliminar",
+            cancelButtonText: "Cancelar"
+        });
+
+        if (!result.isConfirmed) return;
+
         try {
             const authTokens = JSON.parse(localStorage.getItem('authTokens'));
             const token = authTokens?.access;
@@ -191,70 +222,163 @@ function AdminView() {
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             
+            Swal.fire({
+                icon: "success",
+                title: "Evento eliminado",
+                text: "El evento ha sido eliminado del calendario.",
+                timer: 3000,
+                timerProgressBar: true,
+            });
+            
             cargarEventosCalendario();
             return true;
         } catch (error) {
             console.error("Error eliminando evento:", error.response?.data || error.message);
+            Swal.fire({
+                icon: "error",
+                title: "Error",
+                text: "No se pudo eliminar el evento.",
+            });
             throw error;
         }
     };
 
     const handleEliminarMensaje = async (id) => {
-        if (window.confirm("¿Estás seguro de borrar este mensaje?")) {
-            try {
-                await axios.delete(`http://127.0.0.1:8000/api/contacto/${id}/`);
-                setMensajesContacto(mensajesContacto.filter(msg => msg.id !== id));
-                alert("Mensaje eliminado correctamente");
-            } catch (error) {
-                console.error("Error borrando mensaje", error);
-                alert("Hubo un error al eliminar el mensaje");
-            }
+        const result = await Swal.fire({
+            title: "¿Eliminar mensaje?",
+            text: "Esta acción no se puede deshacer.",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#3085d6",
+            cancelButtonColor: "#d33",
+            confirmButtonText: "Sí, eliminar",
+            cancelButtonText: "Cancelar"
+        });
+
+        if (!result.isConfirmed) return;
+
+        try {
+            await axios.delete(`http://127.0.0.1:8000/api/contacto/${id}/`);
+            setMensajesContacto(mensajesContacto.filter(msg => msg.id !== id));
+            Swal.fire({
+                icon: "success",
+                title: "Mensaje eliminado",
+                text: "El mensaje ha sido eliminado correctamente.",
+                timer: 3000,
+                timerProgressBar: true,
+            });
+        } catch (error) {
+            console.error("Error borrando mensaje", error);
+            Swal.fire({
+                icon: "error",
+                title: "Error",
+                text: "Hubo un error al eliminar el mensaje.",
+            });
         }
     };
 
     const handleEliminar = async (id, titulo) => {
-        if (window.confirm(`¿Estás seguro de eliminar el anuncio "${titulo}"?`)) {
-            try {
-                await deleteAnuncio(id);
-                setAnuncios(anuncios.filter(anuncio => anuncio.id !== id));
-                alert("Anuncio eliminado correctamente");
-            } catch (error) {
-                console.error("Error al eliminar:", error);
-                alert("Error al eliminar el anuncio.");
-            }
+        const result = await Swal.fire({
+            title: "¿Eliminar anuncio?",
+            html: `¿Estás seguro de eliminar el anuncio <strong>"${titulo}"</strong>?`,
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#3085d6",
+            cancelButtonColor: "#d33",
+            confirmButtonText: "Sí, eliminar",
+            cancelButtonText: "Cancelar"
+        });
+
+        if (!result.isConfirmed) return;
+
+        try {
+            await deleteAnuncio(id);
+            setAnuncios(anuncios.filter(anuncio => anuncio.id !== id));
+            Swal.fire({
+                icon: "success",
+                title: "Anuncio eliminado",
+                text: "El anuncio ha sido eliminado correctamente.",
+                timer: 3000,
+                timerProgressBar: true,
+            });
+        } catch (error) {
+            console.error("Error al eliminar:", error);
+            Swal.fire({
+                icon: "error",
+                title: "Error",
+                text: "No se pudo eliminar el anuncio.",
+            });
         }
     };
 
     const handleEliminarLibro = async (id, titulo) => {
-        if (window.confirm(`¿Estás seguro de eliminar el libro de cuentas "${titulo}"?`)) {
-            try {
-                await deleteLibroCuenta(id);
-                setLibrosCuentas(librosCuentas.filter(libro => libro.id !== id));
-                alert("Libro de cuentas eliminado correctamente");
-            } catch (error) {
-                console.error("Error al eliminar libro:", error);
-                alert("Error al eliminar el libro de cuentas.");
-            }
+        const result = await Swal.fire({
+            title: "¿Eliminar libro de cuentas?",
+            html: `¿Estás seguro de eliminar el libro <strong>"${titulo}"</strong>?`,
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#3085d6",
+            cancelButtonColor: "#d33",
+            confirmButtonText: "Sí, eliminar",
+            cancelButtonText: "Cancelar"
+        });
+
+        if (!result.isConfirmed) return;
+
+        try {
+            await deleteLibroCuenta(id);
+            setLibrosCuentas(librosCuentas.filter(libro => libro.id !== id));
+            Swal.fire({
+                icon: "success",
+                title: "Libro eliminado",
+                text: "El libro de cuentas ha sido eliminado correctamente.",
+                timer: 3000,
+                timerProgressBar: true,
+            });
+        } catch (error) {
+            console.error("Error al eliminar libro:", error);
+            Swal.fire({
+                icon: "error",
+                title: "Error",
+                text: "No se pudo eliminar el libro de cuentas.",
+            });
         }
     };
 
-    // FUNCIÓN MEJORADA - CREA USUARIO AUTOMÁTICO Y LO ASIGNA AL GRUPO SOCIO
+    // FUNCIÓN MODIFICADA - SIN ALERTA CON CREDENCIALES
     const handleEstadoSolicitud = async (id, nuevoEstado) => {
         try {
             let authTokens = localStorage.getItem('authTokens') ? JSON.parse(localStorage.getItem('authTokens')) : null;
 
             if (!authTokens || !authTokens.access) {
-                alert("No estás autenticado. Por favor, inicia sesión.");
+                Swal.fire({
+                    icon: "error",
+                    title: "No autenticado",
+                    text: "No estás autenticado. Por favor, inicia sesión."
+                });
                 return;
             }
 
             console.log(`Procesando solicitud ${id} con estado ${nuevoEstado}`);
 
             if (nuevoEstado === 'APROBADO') {
-                // Usar la nueva URL que crea usuario automático
+                const confirmacion = await Swal.fire({
+                    title: "¿Aprobar solicitud?",
+                    html: "Se creará un usuario automáticamente para el socio.<br><br>¿Deseas continuar?",
+                    icon: "question",
+                    showCancelButton: true,
+                    confirmButtonColor: "#3085d6",
+                    cancelButtonColor: "#d33",
+                    confirmButtonText: "Sí, aprobar",
+                    cancelButtonText: "Cancelar",
+                    reverseButtons: true
+                });
+
+                if (!confirmacion.isConfirmed) return;
+
                 const response = await axios.post(
                     `http://127.0.0.1:8000/api/admin/solicitudes/${id}/aprobar-con-usuario/`, 
-                    {},  // cuerpo vacío
+                    {}, 
                     { 
                         headers: {
                             'Authorization': `Bearer ${authTokens.access}`,
@@ -263,53 +387,17 @@ function AdminView() {
                     }
                 );
                 
-                // ✅ MEJORADO: Mostrar información COMPLETA con contraseña
                 if (response.data.success) {
-                    let mensaje = `✅ ${response.data.message}\n\n`;
+                    // ALERTA SIMPLE - SIN MOSTRAR CREDENCIALES
+                    await Swal.fire({
+                        title: "¡Solicitud Aprobada!",
+                        text: "El usuario ha sido creado exitosamente.",
+                        icon: "success",
+                        confirmButtonText: "Entendido",
+                        confirmButtonColor: "#3085d6"
+                    });
                     
-                    // ✅ AGREGAR INFORMACIÓN DETALLADA
-                    mensaje += `📋 INFORMACIÓN DEL SOCIO:\n`;
-                    mensaje += `────────────────────────────\n`;
-                    mensaje += `👤 Nombre: ${response.data.nombre_completo || 'No disponible'}\n`;
-                    mensaje += `📧 Email: ${response.data.email || 'No disponible'}\n`;
-                    mensaje += `🔑 Usuario: ${response.data.usuario || 'No disponible'}\n`;
-                    
-                    if (response.data.password) {
-                        mensaje += `🔒 Contraseña: ${response.data.password}\n`;
-                    }
-                    
-                    mensaje += `📅 Estado: ${response.data.estado || 'No disponible'}\n`;
-                    mensaje += `👥 Grupo SOCIO: ${response.data.grupo_socio ? '✅ Asignado' : '❌ No asignado'}\n`;
-                    mensaje += `✅ Usuario activo: ${response.data.usuario_activo ? 'SÍ' : 'NO (activar en Django Admin)'}\n\n`;
-                    
-                    // ✅ AGREGAR INSTRUCCIONES SI EL USUARIO ESTÁ INACTIVO
-                    if (!response.data.usuario_activo) {
-                        mensaje += `⚠️ IMPORTANTE - PASOS A SEGUIR:\n`;
-                        mensaje += `────────────────────────────────\n`;
-                        mensaje += `1. Ve a Django Admin → Usuarios\n`;
-                        mensaje += `2. Busca al usuario: ${response.data.usuario}\n`;
-                        mensaje += `3. Activa la casilla "Activo"\n`;
-                        mensaje += `4. Guarda los cambios\n`;
-                        mensaje += `5. Envía estas credenciales al socio:\n\n`;
-                        mensaje += `   📧 CREDENCIALES PARA ENVIAR:\n`;
-                        mensaje += `   -----------------------------\n`;
-                        mensaje += `   Usuario: ${response.data.usuario}\n`;
-                        mensaje += `   Contraseña: ${response.data.password}\n`;
-                    } else {
-                        mensaje += `✅ USUARIO ACTIVO - LISTO PARA USAR:\n`;
-                        mensaje += `────────────────────────────────────\n`;
-                        mensaje += `📧 Envía estas credenciales al socio:\n\n`;
-                        mensaje += `   🔑 CREDENCIALES:\n`;
-                        mensaje += `   --------------\n`;
-                        mensaje += `   Usuario: ${response.data.usuario}\n`;
-                        mensaje += `   Contraseña: ${response.data.password}\n\n`;
-                        mensaje += `   El socio puede iniciar sesión inmediatamente.\n`;
-                    }
-                    
-                    // ✅ Mostrar en alert con mejor formato
-                    alert(mensaje);
-                    
-                    // ✅ Guardar contraseña en localStorage para referencia
+                    // Guardar contraseña en localStorage para referencia
                     if (response.data.password && response.data.usuario) {
                         localStorage.setItem(`credenciales_${response.data.usuario}`, 
                             JSON.stringify({
@@ -321,24 +409,42 @@ function AdminView() {
                         );
                     }
                     
-                    // ✅ Actualizar la solicitud en el estado local
+                    // Actualizar la solicitud en el estado local
                     setSolicitudesIngreso(prev => prev.map(solicitud => {
                         if (solicitud.id === id) {
                             return {
                                 ...solicitud,
                                 estado: 'APROBADO',
                                 usuario_creado: response.data.usuario,
-                                password_generada: response.data.password // ✅ Agregar contraseña
+                                password_generada: response.data.password
                             };
                         }
                         return solicitud;
                     }));
                     
                 } else {
-                    alert(`⚠️ ${response.data.message || 'Error desconocido'}`);
+                    Swal.fire({
+                        icon: "warning",
+                        title: "Advertencia",
+                        text: response.data.message || 'Error desconocido',
+                    });
                 }
             } else {
-                // Para RECHAZADO, usar el endpoint normal
+                // Para RECHAZADO
+                const confirmacion = await Swal.fire({
+                    title: "¿Rechazar solicitud?",
+                    text: "La solicitud será marcada como rechazada.",
+                    icon: "warning",
+                    showCancelButton: true,
+                    confirmButtonColor: "#d33",
+                    cancelButtonColor: "#3085d6",
+                    confirmButtonText: "Sí, rechazar",
+                    cancelButtonText: "Cancelar",
+                    reverseButtons: true
+                });
+
+                if (!confirmacion.isConfirmed) return;
+
                 await axios.patch(
                     `http://127.0.0.1:8000/api/admin/solicitudes/${id}/`, 
                     { estado: nuevoEstado },
@@ -349,7 +455,14 @@ function AdminView() {
                         }
                     }
                 );
-                alert(`✅ Solicitud ${nuevoEstado.toLowerCase()} correctamente.`);
+                
+                Swal.fire({
+                    icon: "success",
+                    title: "Solicitud Rechazada",
+                    text: "La solicitud ha sido rechazada correctamente.",
+                    timer: 3000,
+                    timerProgressBar: true,
+                });
                 
                 // Actualizar estado local
                 setSolicitudesIngreso(prev => prev.map(solicitud => {
@@ -364,22 +477,49 @@ function AdminView() {
             console.error("Error actualizando estado", error);
             
             if (error.response?.status === 401) {
-                alert("Tu sesión ha expirado. Por favor, inicia sesión nuevamente.");
-                logoutUser();
+                Swal.fire({
+                    icon: "error",
+                    title: "Sesión expirada",
+                    text: "Tu sesión ha expirado. Por favor, inicia sesión nuevamente."
+                }).then(() => {
+                    logoutUser();
+                });
             } else if (error.response?.data?.error) {
-                alert(`❌ Error: ${error.response.data.error}`);
+                Swal.fire({
+                    icon: "error",
+                    title: "Error",
+                    text: `❌ Error: ${error.response.data.error}`,
+                });
             } else if (error.response?.data?.message) {
-                alert(`❌ Error: ${error.response.data.message}`);
+                Swal.fire({
+                    icon: "error",
+                    title: "Error",
+                    text: `❌ Error: ${error.response.data.message}`,
+                });
             } else {
-                alert("❌ Hubo un error al actualizar el estado. Verifica la consola para más detalles.");
+                Swal.fire({
+                    icon: "error",
+                    title: "Error",
+                    text: "Hubo un error al actualizar el estado. Verifica la consola para más detalles.",
+                });
             }
         }
     };
 
     const handleEliminarSolicitud = async (id) => {
-        if (!window.confirm("¿Estás seguro? Al borrarlo, el RUT quedará liberado para postular nuevamente.")) {
-            return;
-        }
+        const result = await Swal.fire({
+            title: "¿Eliminar registro?",
+            html: "¿Estás seguro? <br><br>Al borrarlo, el RUT quedará liberado para postular nuevamente.",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#d33",
+            cancelButtonColor: "#3085d6",
+            confirmButtonText: "Sí, eliminar",
+            cancelButtonText: "Cancelar",
+            reverseButtons: true
+        });
+
+        if (!result.isConfirmed) return;
 
         try {
             let authTokens = localStorage.getItem('authTokens') ? JSON.parse(localStorage.getItem('authTokens')) : null;
@@ -390,10 +530,20 @@ function AdminView() {
                 }
             });
             cargarSolicitudesIngreso();
-            alert("✅ Registro eliminado correctamente.");
+            Swal.fire({
+                icon: "success",
+                title: "Registro eliminado",
+                text: "El registro ha sido eliminado correctamente.",
+                timer: 3000,
+                timerProgressBar: true,
+            });
         } catch (error) {
             console.error(error);
-            alert("❌ Error al eliminar el registro.");
+            Swal.fire({
+                icon: "error",
+                title: "Error",
+                text: "No se pudo eliminar el registro.",
+            });
         }
     };
 
@@ -424,37 +574,38 @@ function AdminView() {
     const handleGuardar = async (e) => {
         e.preventDefault();
 
-        // Usamos FormData en lugar de un objeto JSON simple
         const formData = new FormData();
         formData.append('titulo', titulo.trim());
         formData.append('descripcion', descripcion.trim());
         
-        // Solo agregamos la imagen si el usuario seleccionó un archivo nuevo
-        // (Si es un string, significa que es la URL vieja y no la tocamos, o el backend la maneja)
         if (imagen instanceof File) {
             formData.append('imagen', imagen);
         }
 
         try {
             let config = {
-                headers: { 'Content-Type': 'multipart/form-data' } // Importante para archivos
+                headers: { 'Content-Type': 'multipart/form-data' }
             };
 
-            // Si necesitamos token (que seguro sí), lo agregamos aquí
             const authTokens = JSON.parse(localStorage.getItem('authTokens'));
             if (authTokens?.access) {
                 config.headers['Authorization'] = `Bearer ${authTokens.access}`;
             }
 
             if (editandoId) {
-                const response = await axios.patch( // Usamos PATCH para actualizar parcialmente
+                const response = await axios.patch(
                     `http://127.0.0.1:8000/api/anuncios/${editandoId}/`,
                     formData,
                     config
                 );
-                // Actualizamos la lista local
                 setAnuncios(anuncios.map(a => a.id === editandoId ? response.data : a));
-                alert("✅ Noticia actualizada correctamente");
+                Swal.fire({
+                    icon: "success",
+                    title: "Noticia actualizada",
+                    text: "La noticia ha sido actualizada correctamente.",
+                    timer: 3000,
+                    timerProgressBar: true,
+                });
             } else {
                 const response = await axios.post(
                     'http://127.0.0.1:8000/api/anuncios/',
@@ -462,13 +613,23 @@ function AdminView() {
                     config
                 );
                 setAnuncios([...anuncios, response.data]);
-                alert("✅ Noticia creada correctamente");
+                Swal.fire({
+                    icon: "success",
+                    title: "Noticia creada",
+                    text: "La noticia ha sido creada correctamente.",
+                    timer: 3000,
+                    timerProgressBar: true,
+                });
             }
 
             cancelarForm();
         } catch (error) {
             console.error("Error al guardar:", error);
-            alert("❌ Error al guardar la noticia.");
+            Swal.fire({
+                icon: "error",
+                title: "Error",
+                text: "No se pudo guardar la noticia. Verifica los datos.",
+            });
         }
     };
 
@@ -578,12 +739,10 @@ function AdminView() {
     };
 
     const renderAnuncios = () => {
-        // 1. Ordenar: Lo más nuevo primero
         const anunciosOrdenados = [...anuncios].sort((a, b) => {
             return new Date(b.creado_en) - new Date(a.creado_en);
         });
 
-        // 2. Lógica de Paginación
         const indiceUltimo = paginaAnuncios * anunciosPorPagina;
         const indicePrimero = indiceUltimo - anunciosPorPagina;
         const anunciosVisibles = anunciosOrdenados.slice(indicePrimero, indiceUltimo);
@@ -620,7 +779,6 @@ function AdminView() {
                         <div className="grid gap-4">
                             {anunciosVisibles.map((a) => (
                                 <div key={a.id} className="border border-gray-200 p-4 rounded-lg bg-white hover:bg-gray-50 transition duration-200 shadow-sm flex flex-col sm:flex-row gap-4">
-                                    {/* Miniatura de la imagen */}
                                     {a.imagen && (
                                         <div className="flex-shrink-0">
                                             <div className="w-full sm:w-32 h-32 rounded-md overflow-hidden bg-gray-100 border border-gray-200">
@@ -663,7 +821,6 @@ function AdminView() {
                             ))}
                         </div>
 
-                        {/* CONTROLES DE PAGINACIÓN */}
                         {totalPaginasAnuncios > 1 && (
                             <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-100">
                                 <button 
@@ -688,9 +845,6 @@ function AdminView() {
                     </>
                 )}
 
-                {/* ================================================================= */}
-                {/* ¡AQUÍ ESTÁ LA PARTE QUE FALTABA! EL MODAL DE CREACIÓN/EDICIÓN */}
-                {/* ================================================================= */}
                 {mostrarForm && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                         <div className="bg-white rounded-lg shadow-xl w-full max-w-xl overflow-hidden">

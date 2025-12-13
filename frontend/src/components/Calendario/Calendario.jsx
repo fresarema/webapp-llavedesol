@@ -15,6 +15,7 @@ import {
   startOfDay
 } from 'date-fns';
 import { es } from 'date-fns/locale';
+import Swal from 'sweetalert2'; // Añadir esta importación
 
 const Calendario = ({ 
   eventos = [], 
@@ -76,7 +77,13 @@ const Calendario = ({
     
     // Verifica si la fecha ya pasó
     if (fechaYaPaso(dia)) {
-      alert('No se pueden crear eventos en fechas pasadas');
+      Swal.fire({
+        icon: "warning",
+        title: "Fecha no válida",
+        text: "No se pueden crear eventos en fechas pasadas.",
+        timer: 3000,
+        timerProgressBar: true,
+      });
       return;
     }
     
@@ -121,7 +128,13 @@ const Calendario = ({
     // Verifica si la fecha ya pasó
     const fechaEvento = new Date(formEvento.fecha);
     if (fechaYaPaso(fechaEvento)) {
-      alert('No se pueden crear o modificar eventos en fechas pasadas');
+      Swal.fire({
+        icon: "warning",
+        title: "Fecha no válida",
+        text: "No se pueden crear o modificar eventos en fechas pasadas.",
+        timer: 3000,
+        timerProgressBar: true,
+      });
       return;
     }
     
@@ -149,8 +162,22 @@ const Calendario = ({
         setEventosLocales(prev => 
           prev.map(ev => ev.id === eventoSeleccionado.id ? {...eventoData, id: eventoSeleccionado.id} : ev)
         );
+        Swal.fire({
+          icon: "success",
+          title: "Evento actualizado",
+          text: "El evento ha sido actualizado correctamente.",
+          timer: 3000,
+          timerProgressBar: true,
+        });
       } else {
         setEventosLocales(prev => [...prev, {...eventoData, id: Date.now()}]);
+        Swal.fire({
+          icon: "success",
+          title: "Evento creado",
+          text: "El evento ha sido creado correctamente.",
+          timer: 3000,
+          timerProgressBar: true,
+        });
       }
     }
     
@@ -158,19 +185,49 @@ const Calendario = ({
   };
 
   // Eliminar evento (SOLO para admin)
-  const eliminarEvento = () => {
+  const eliminarEvento = async () => {
     if (!eventoSeleccionado) return;
     
-    if (onEliminarEvento) {
-      onEliminarEvento(eventoSeleccionado.id);
-    } else {
-      // Modo demo
-      setEventosLocales(prev => 
-        prev.filter(ev => ev.id !== eventoSeleccionado.id)
-      );
+    // Confirmación de eliminación
+    const result = await Swal.fire({
+      title: "¿Eliminar evento?",
+      html: `¿Estás seguro de eliminar el evento <strong>"${eventoSeleccionado.titulo}"</strong>?<br><br>Esta acción no se puede deshacer.`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Sí, eliminar",
+      cancelButtonText: "Cancelar",
+      reverseButtons: true
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      if (onEliminarEvento) {
+        await onEliminarEvento(eventoSeleccionado.id);
+      } else {
+        // Modo demo
+        setEventosLocales(prev => 
+          prev.filter(ev => ev.id !== eventoSeleccionado.id)
+        );
+        Swal.fire({
+          icon: "success",
+          title: "Evento eliminado",
+          text: "El evento ha sido eliminado correctamente.",
+          timer: 3000,
+          timerProgressBar: true,
+        });
+      }
+      
+      cerrarModal();
+    } catch (error) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "No se pudo eliminar el evento. Inténtalo de nuevo.",
+      });
     }
-    
-    cerrarModal();
   };
 
   const cerrarModal = () => {
@@ -277,7 +334,7 @@ const Calendario = ({
                     backgroundColor: '#3498db',
                     color: 'white',
                     borderRadius: '4px',
-                    cursor: 'pointer', // ✅ TODOS pueden hacer clic para ver detalles
+                    cursor: 'pointer',
                     opacity: esPasado ? 0.7 : 1,
                     transition: 'all 0.2s',
                     fontWeight: '500',
@@ -320,7 +377,13 @@ const Calendario = ({
           onClick={() => {
             // Verifica si hoy ya pasó (para medianoche)
             if (fechaYaPaso(new Date())) {
-              alert('No se pueden crear eventos en fechas pasadas');
+              Swal.fire({
+                icon: "warning",
+                title: "Fecha no válida",
+                text: "No se pueden crear eventos en fechas pasadas.",
+                timer: 3000,
+                timerProgressBar: true,
+              });
               return;
             }
             
