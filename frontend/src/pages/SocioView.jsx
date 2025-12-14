@@ -7,12 +7,62 @@ import MensajesPanel from '../components/MensajesPanel/MensajesPanel';
 import Fondo from "../assets/fondo.png";
 import Logo from "../assets/Logo.png";
 
+// Componente Menú Lateral (Extraído para limpieza)
+const SocioSideMenu = ({ activeSection, setActiveSection, onOpenChangePassword, isOpen, closeMenu }) => {
+    const btnClass = (section) => `
+        w-full p-3 text-left rounded-lg transition-all duration-200 flex items-center gap-3 font-medium
+        ${activeSection === section 
+            ? 'bg-blue-600 text-white shadow-md' 
+            : 'text-gray-700 hover:bg-gray-100'}
+    `;
+
+    return (
+        <div className={`
+            bg-white rounded-lg shadow-md p-5 flex-shrink-0
+            transition-all duration-300 ease-in-out
+            ${isOpen ? 'block' : 'hidden'} lg:block 
+            w-full lg:w-64 lg:sticky lg:top-6 lg:self-start mb-6 lg:mb-0
+        `}>
+            <h3 className="text-base font-bold mb-4 text-gray-700 uppercase tracking-wider">Menú Socio</h3>
+            <div className="flex flex-col gap-2">
+                <button 
+                    onClick={() => { setActiveSection('anuncios'); closeMenu(); }}
+                    className={btnClass('anuncios')}
+                >
+                    <span className="text-lg">📢</span> Anuncios
+                </button>
+                
+                <button 
+                    onClick={() => { setActiveSection('calendario'); closeMenu(); }}
+                    className={btnClass('calendario')}
+                >
+                    <span className="text-lg">🗓️</span> Calendario
+                </button>
+                
+                <div className="border-t my-2 border-gray-100"></div>
+
+                <button 
+                    onClick={() => { onOpenChangePassword(true); closeMenu(); }}
+                    className="w-full p-3 text-left rounded-lg transition-all duration-200 flex items-center gap-3 font-medium text-gray-700 hover:bg-yellow-50 hover:text-yellow-700"
+                >
+                    <span className="text-lg">🔑</span> Cambiar Contraseña
+                </button>
+            </div>
+        </div>
+    );
+};
+
 function SocioView() {
     const { user, logoutUser } = useAuth();
+    
+    // Estados principales
     const [anuncios, setAnuncios] = useState([]);
     const [eventos, setEventos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [seccionActiva, setSeccionActiva] = useState('anuncios');
+    
+    // Estado para el menú móvil (Responsive)
+    const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
     
     // Estados para el cambio de contraseña
     const [mostrarCambioPassword, setMostrarCambioPassword] = useState(false);
@@ -66,7 +116,6 @@ function SocioView() {
         }
     };
 
-    // Función para cambiar contraseña
     const handleCambiarPassword = async (e) => {
         e.preventDefault();
         
@@ -104,7 +153,7 @@ function SocioView() {
             };
             
             // Llamar al servicio de cambio de contraseña
-            const resultado = await cambiarPassword(datos, token);
+            await cambiarPassword(datos, token);
             
             // Si fue exitoso
             setMensajePassword('✅ Contraseña cambiada correctamente');
@@ -158,7 +207,7 @@ function SocioView() {
                 }}
             >
                 <div className="bg-white/90 backdrop-blur-sm p-8 rounded-lg shadow-lg">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4 mx-auto"></div>
                     <p className="text-gray-700 font-medium">Cargando panel de socio...</p>
                 </div>
             </div>
@@ -166,183 +215,88 @@ function SocioView() {
     }
 
     return (
-        <div 
-            style={{ 
-                background: `url(${Fondo}) fixed center/cover no-repeat`,
-                minHeight: '100vh',
-                padding: '20px'
-            }}
-        >
-            <div style={{
-                minHeight: '100vh',
-                margin: '-20px',
-                padding: '20px'
-            }}>
-                {/* Header */}
-                <div className="rounded-lg shadow-md p-6 mb-6"
-                    style={{
-                        backgroundColor: '#1e2939',
-                        background: 'linear-gradient(135deg, #1e2939 0%, #2d3748 100%)'
-                    }}>
-                    <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-4">
-                            <div className="w-16 h-16 rounded-full overflow-hidden bg-white p-1">
-                                <img 
-                                    src={Logo} 
-                                    alt="Logo ONG Llave de Sol"
-                                    className="w-full h-full object-contain"
-                                />
-                            </div>
-                            <div>
-                                <h1 className="text-2xl font-bold text-white">
-                                    ONG Llave de Sol - Panel de Socio
-                                </h1>
-                                <p className="text-base mt-2 text-white">
-                                    ¡Bienvenido, <span className="font-semibold">{user?.username}!</span>
-                                </p>
-                                <p className="text-sm mt-1 text-gray-300">
-                                    Estás en el grupo: <span className="font-semibold">SOCIO</span>
-                                </p>
-                            </div>
-                        </div>
-                        <button 
-                            onClick={logoutUser}
-                            className="bg-red-500 hover:bg-red-600 text-white py-2 px-5 rounded-lg font-medium transition duration-300 text-sm"
-                        >
-                            Cerrar Sesión
-                        </button>
+        <div style={{ background: `url(${Fondo}) fixed center/cover no-repeat`, minHeight: '100vh' }} className="p-4">
+            
+            {/* --- HEADER RESPONSIVO --- */}
+            <div className="bg-gray-900 bg-opacity-90 rounded-xl shadow-lg p-6 mb-6 flex flex-col md:flex-row justify-between items-center gap-4 text-white">
+                <div className="flex items-center gap-4 w-full md:w-auto">
+                    <div className="w-16 h-16 rounded-full bg-white p-1 flex-shrink-0">
+                        <img src={Logo} alt="Logo" className="w-full h-full object-contain" />
                     </div>
+                    <div>
+                        <h1 className="text-xl md:text-2xl font-bold leading-tight">Panel de Socio</h1>
+                        <p className="text-sm md:text-base text-gray-300">
+                            Bienvenido, <span className="font-semibold text-white">{user?.username}</span>
+                        </p>
+                    </div>
+                    {/* Botón Hamburguesa (Solo Móvil) */}
+                    <button 
+                        onClick={() => setMenuMovilAbierto(!menuMovilAbierto)}
+                        className="md:hidden ml-auto text-3xl focus:outline-none hover:text-blue-400 transition"
+                    >
+                        ☰
+                    </button>
                 </div>
+                <button 
+                    onClick={logoutUser} 
+                    className="hidden md:block bg-red-500 hover:bg-red-600 px-6 py-2 rounded-lg font-bold text-sm transition"
+                >
+                    Cerrar Sesión
+                </button>
+            </div>
 
-                <div className="flex gap-4">
-                    {/* Menú lateral */}
-                    <div style={{
-                        width: '220px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        flexShrink: 0
-                    }}>
-                        <div className="bg-white rounded-lg shadow-md p-5">
-                            <h3 className="text-base font-bold mb-4 text-gray-700">Menú Socio</h3>
-                            <div style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '8px'
-                            }}>
-                                <button 
-                                    onClick={() => setSeccionActiva('anuncios')}
-                                    style={{
-                                        width: '100%',
-                                        padding: '10px 14px',
-                                        textAlign: 'left',
-                                        borderRadius: '6px',
-                                        border: 'none',
-                                        backgroundColor: seccionActiva === 'anuncios' ? '#3b82f6' : 'transparent',
-                                        color: seccionActiva === 'anuncios' ? 'white' : '#374151',
-                                        fontWeight: '500',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '10px',
-                                        fontSize: '14px'
-                                    }}
-                                >
-                                    <span>📢</span>
-                                    <span>Anuncios</span>
-                                </button>
-                                
-                                <button 
-                                    onClick={() => setSeccionActiva('calendario')}
-                                    style={{
-                                        width: '100%',
-                                        padding: '10px 14px',
-                                        textAlign: 'left',
-                                        borderRadius: '6px',
-                                        border: 'none',
-                                        backgroundColor: seccionActiva === 'calendario' ? '#3b82f6' : 'transparent',
-                                        color: seccionActiva === 'calendario' ? 'white' : '#374151',
-                                        fontWeight: '500',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '10px',
-                                        fontSize: '14px'
-                                    }}
-                                >
-                                    <span>📅</span>
-                                    <span>Calendario</span>
-                                </button>
-                                
-                                <button 
-                                    onClick={() => setMostrarCambioPassword(true)}
-                                    style={{
-                                        width: '100%',
-                                        padding: '10px 14px',
-                                        textAlign: 'left',
-                                        borderRadius: '6px',
-                                        border: 'none',
-                                        backgroundColor: mostrarCambioPassword ? '#3b82f6' : 'transparent',
-                                        color: mostrarCambioPassword ? 'white' : '#374151',
-                                        fontWeight: '500',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '10px',
-                                        fontSize: '14px'
-                                    }}
-                                >
-                                    <span>🔑</span>
-                                    <span>Cambiar Contraseña</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+            {/* --- CONTENEDOR FLEX PRINCIPAL (Column en móvil, Row en Desktop) --- */}
+            <div className="flex flex-col lg:flex-row gap-6 items-start">
+                
+                {/* 1. MENÚ LATERAL */}
+                <SocioSideMenu 
+                    activeSection={seccionActiva} 
+                    setActiveSection={setSeccionActiva} 
+                    onOpenChangePassword={setMostrarCambioPassword}
+                    isOpen={menuMovilAbierto}
+                    closeMenu={() => setMenuMovilAbierto(false)}
+                />
 
-                    {/* Contenido principal */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                {/* 2. CONTENIDO CENTRAL */}
+                <div className="flex-1 w-full min-w-0 flex flex-col lg:flex-row gap-6">
+                    
+                    {/* Área Dinámica (Anuncios/Calendario) */}
+                    <div className="flex-1 min-w-0">
                         {seccionActiva === 'anuncios' && (
-                            <div className="bg-white rounded-lg shadow-md p-6">
-                                <div className="flex justify-between items-center mb-6">
+                            <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
+                                <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-3">
                                     <h2 className="text-2xl font-bold text-gray-800">📢 Anuncios</h2>
-                                    <span className="bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded">
-                                        {anuncios.length} anuncio(s)
+                                    <span className="bg-blue-100 text-blue-800 text-sm font-bold px-3 py-1 rounded-full">
+                                        {anuncios.length} nuevos
                                     </span>
                                 </div>
                                 
                                 {anuncios.length === 0 ? (
-                                    <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
+                                    <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
                                         <p className="text-gray-500 text-lg">No hay anuncios disponibles.</p>
-                                        <p className="text-gray-400 text-sm mt-2">
-                                            Los administradores publicarán anuncios importantes aquí.
-                                        </p>
+                                        <p className="text-gray-400 text-sm mt-1">Los administradores publicarán novedades pronto.</p>
                                     </div>
                                 ) : (
-                                    <div className="space-y-4">
+                                    <div className="space-y-6">
                                         {anuncios.map(anuncio => (
-                                            <div key={anuncio.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition duration-200 shadow-sm">
-                                                <div className="flex gap-4">
-                                                    {anuncio.imagen && (
-                                                        <div className="flex-shrink-0">
-                                                            <div className="w-24 h-24 rounded-lg overflow-hidden border border-gray-300">
-                                                                <img 
-                                                                    src={anuncio.imagen} 
-                                                                    alt={anuncio.titulo}
-                                                                    className="w-full h-full object-cover"
-                                                                    onError={(e) => e.target.style.display = 'none'}
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    
-                                                    <div className="flex-1">
-                                                        <h3 className="text-xl font-bold text-gray-800 mb-2">{anuncio.titulo}</h3>
-                                                        <p className="text-gray-600 mb-3">{anuncio.descripcion}</p>
-                                                        <div className="text-xs text-gray-500">
-                                                            📅 Publicado: {formatearFecha(anuncio.creado_en)}
-                                                        </div>
+                                            <div key={anuncio.id} className="border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition duration-300 bg-white flex flex-col md:flex-row">
+                                                {anuncio.imagen && (
+                                                    <div className="md:w-48 h-48 md:h-auto flex-shrink-0 bg-gray-100">
+                                                        <img 
+                                                            src={anuncio.imagen} 
+                                                            alt={anuncio.titulo}
+                                                            className="w-full h-full object-cover"
+                                                            onError={(e) => e.target.style.display = 'none'}
+                                                        />
+                                                    </div>
+                                                )}
+                                                <div className="p-5 flex-1 flex flex-col justify-between">
+                                                    <div>
+                                                        <h3 className="text-xl font-bold text-gray-900 mb-2 leading-tight">{anuncio.titulo}</h3>
+                                                        <p className="text-gray-600 mb-4 text-sm leading-relaxed line-clamp-3">{anuncio.descripcion}</p>
+                                                    </div>
+                                                    <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                                                        📅 Publicado el {formatearFecha(anuncio.creado_en)}
                                                     </div>
                                                 </div>
                                             </div>
@@ -353,142 +307,119 @@ function SocioView() {
                         )}
 
                         {seccionActiva === 'calendario' && (
-                            <div className="bg-white rounded-lg shadow-md p-6">
-                                <h2 className="text-2xl font-bold mb-6 text-gray-800">📅 Calendario de Eventos</h2>
-                                <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                                    <p className="text-blue-800 text-sm">
-                                        <span className="font-bold">Modo solo lectura:</span> Los socios pueden ver los eventos pero no editarlos.
-                                    </p>
+                            <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
+                                <h2 className="text-2xl font-bold mb-4 text-gray-800">📅 Calendario de Eventos</h2>
+                                <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200 flex items-start gap-3">
+                                    <span className="text-2xl">ℹ️</span>
+                                    <div>
+                                        <p className="text-blue-900 font-semibold text-sm">Información</p>
+                                        <p className="text-blue-800 text-sm">Aquí puedes ver las próximas actividades. Solo lectura.</p>
+                                    </div>
                                 </div>
-                                <Calendario 
-                                    eventos={eventos}
-                                    modo="socio"  
-                                />
+                                <Calendario eventos={eventos} modo="socio" />
                             </div>
                         )}
                     </div>
 
-                    {/* Panel de mensajes (derecha) - SE MANTIENE */}
-                    <div style={{ 
-                        width: '380px',
-                        flexShrink: 0
-                    }}>
+                    {/* 3. PANEL DE MENSAJES (DERECHA/ABAJO) */}
+                    <div className="w-full lg:w-80 flex-shrink-0">
                         <MensajesPanel userType="SOCIO" />
+                        
+                        {/* Botón cerrar sesión móvil */}
+                        <button onClick={logoutUser} className="md:hidden w-full mt-6 bg-red-500 text-white py-3 rounded-lg font-bold shadow-lg">
+                            Cerrar Sesión
+                        </button>
                     </div>
                 </div>
+            </div>
 
-                {/* Modal de Cambio de Contraseña - SE MANTIENE IGUAL */}
-                {mostrarCambioPassword && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                        <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden">
-                            <div className="bg-gray-100 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                                <h3 className="text-xl font-bold text-gray-800">🔑 Cambiar Contraseña</h3>
+            {/* MODAL CAMBIO DE CONTRASEÑA (RESPONSIVO) */}
+            {mostrarCambioPassword && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-100">
+                        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                            <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                                🔑 Cambiar Contraseña
+                            </h3>
+                            <button 
+                                onClick={() => { 
+                                    setMostrarCambioPassword(false); 
+                                    setMensajePassword(''); 
+                                }} 
+                                className="text-gray-400 hover:text-gray-600 text-2xl transition"
+                            >
+                                &times;
+                            </button>
+                        </div>
+                        
+                        <form onSubmit={handleCambiarPassword} className="p-6 space-y-5">
+                            {mensajePassword && (
+                                <div className={`p-3 rounded-lg text-sm font-medium flex items-center gap-2 ${tipoMensaje === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                    <span>{tipoMensaje === 'success' ? '✅' : '⚠️'}</span>
+                                    {mensajePassword}
+                                </div>
+                            )}
+                            
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Contraseña Actual</label>
+                                <input 
+                                    type="password" 
+                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" 
+                                    value={passwordActual} 
+                                    onChange={(e) => setPasswordActual(e.target.value)} 
+                                    required 
+                                    disabled={cambiandoPassword} 
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Nueva Contraseña</label>
+                                <input 
+                                    type="password" 
+                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" 
+                                    value={nuevaPassword} 
+                                    onChange={(e) => setNuevaPassword(e.target.value)} 
+                                    required 
+                                    disabled={cambiandoPassword} 
+                                    minLength="6" 
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Mínimo 6 caracteres</p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Confirmar Nueva Contraseña</label>
+                                <input 
+                                    type="password" 
+                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" 
+                                    value={confirmarPassword} 
+                                    onChange={(e) => setConfirmarPassword(e.target.value)} 
+                                    required 
+                                    disabled={cambiandoPassword} 
+                                    minLength="6" 
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-2">
                                 <button 
-                                    onClick={() => {
-                                        setMostrarCambioPassword(false);
-                                        setMensajePassword('');
-                                        setPasswordActual('');
-                                        setNuevaPassword('');
-                                        setConfirmarPassword('');
-                                    }}
-                                    className="text-gray-500 hover:text-gray-700 font-bold text-xl"
+                                    type="button" 
+                                    onClick={() => setMostrarCambioPassword(false)} 
+                                    className="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition" 
+                                    disabled={cambiandoPassword}
                                 >
-                                    &times;
+                                    Cancelar
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md transition disabled:opacity-70 flex items-center" 
+                                    disabled={cambiandoPassword}
+                                >
+                                    {cambiandoPassword ? 'Guardando...' : 'Guardar Cambios'}
                                 </button>
                             </div>
-                            
-                            <form onSubmit={handleCambiarPassword}>
-                                <div className="p-6 space-y-4">
-                                    {mensajePassword && (
-                                        <div className={`p-3 rounded ${tipoMensaje === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                            {mensajePassword}
-                                        </div>
-                                    )}
-                                    
-                                    <div>
-                                        <label className="block mb-2">
-                                            <span className="block text-sm font-semibold text-gray-700 mb-2">Contraseña Actual:</span>
-                                            <input
-                                                type="password"
-                                                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                value={passwordActual}
-                                                onChange={(e) => setPasswordActual(e.target.value)}
-                                                placeholder="Ingresa tu contraseña actual"
-                                                required
-                                                disabled={cambiandoPassword}
-                                            />
-                                        </label>
-                                    </div>
-
-                                    <div>
-                                        <label className="block mb-2">
-                                            <span className="block text-sm font-semibold text-gray-700 mb-2">Nueva Contraseña:</span>
-                                            <input
-                                                type="password"
-                                                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                value={nuevaPassword}
-                                                onChange={(e) => setNuevaPassword(e.target.value)}
-                                                placeholder="Ingresa la nueva contraseña"
-                                                required
-                                                disabled={cambiandoPassword}
-                                                minLength="6"
-                                            />
-                                            <p className="text-xs text-gray-500 mt-2">
-                                                Mínimo 6 caracteres
-                                            </p>
-                                        </label>
-                                    </div>
-
-                                    <div>
-                                        <label className="block mb-2">
-                                            <span className="block text-sm font-semibold text-gray-700 mb-2">Confirmar Nueva Contraseña:</span>
-                                            <input
-                                                type="password"
-                                                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                value={confirmarPassword}
-                                                onChange={(e) => setConfirmarPassword(e.target.value)}
-                                                placeholder="Confirma la nueva contraseña"
-                                                required
-                                                disabled={cambiandoPassword}
-                                                minLength="6"
-                                            />
-                                        </label>
-                                    </div>
-                                </div>
-
-                                <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setMostrarCambioPassword(false);
-                                            setMensajePassword('');
-                                            setPasswordActual('');
-                                            setNuevaPassword('');
-                                            setConfirmarPassword('');
-                                        }}
-                                        className="bg-gray-500 hover:bg-gray-600 text-white py-2 px-6 rounded-lg font-medium transition duration-300"
-                                        disabled={cambiandoPassword}
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="bg-green-500 hover:bg-green-600 text-white py-2 px-6 rounded-lg font-medium transition duration-300"
-                                        disabled={cambiandoPassword}
-                                    >
-                                        {cambiandoPassword ? (
-                                            <>
-                                                <span className="animate-spin inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
-                                                Cambiando...
-                                            </>
-                                        ) : 'Cambiar Contraseña'}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
+                        </form>
                     </div>
-                )}
-            </div>
+                </div>
+            )}
         </div>
     );
 }

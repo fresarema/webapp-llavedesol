@@ -168,13 +168,24 @@ const FormularioAdmision = () => {
         }
     };
 
+    const hoy = new Date().toISOString().split('T')[0];
+
+
     return (
         <div className="container mt-5 mb-5">
             <div className="row justify-content-center">
                 <div className="col-md-8 col-lg-6">
                     <div className="card shadow-lg border-0">
                         <div className="card-body p-5 bg-white text-dark rounded">
-                            
+                            <div className="mb-3">
+                                <button 
+                                    onClick={() => navigate('/')}
+                                    className="btn btn-link text-decoration-none text-secondary ps-0 fw-bold"
+                                    style={{ fontSize: '0.9rem' }}
+                                >
+                                    ← Volver al inicio
+                                </button>
+                            </div>
                             <h2 className="text-center mb-4 fw-bold">Únete a nuestra ONG</h2>
                             <p className="text-muted text-center mb-4">Completa tus datos y nos pondremos en contacto.</p>
 
@@ -214,6 +225,7 @@ const FormularioAdmision = () => {
                                             className="form-control" 
                                             required 
                                             onChange={handleChange} 
+                                            max={hoy}
                                         />
                                     </div>
                                 </div>
