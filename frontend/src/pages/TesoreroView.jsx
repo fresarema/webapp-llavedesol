@@ -9,6 +9,7 @@ import {
     getDonaciones,
     exportarDonacionesAExcel
 } from "../services/TesoreroService"; 
+import Swal from 'sweetalert2';
 
 import MensajesPanel from "../components/MensajesPanel/MensajesPanel";
 import Calendario from "../components/Calendario/Calendario"; 
@@ -92,6 +93,40 @@ function TesoreroView() {
         titulo: '', descripcion: '', tipo: 'MENSUAL', fecha_periodo: '', archivo: null
     });
 
+    // --- FUNCIÓN PARA TRADUCIR ERRORES ---
+    const traducirError = (mensaje) => {
+        if (!mensaje) return mensaje;
+        
+        const traducciones = {
+            "already exists": "ya existe en el sistema",
+            "This field is required.": "Este campo es obligatorio.",
+            "Enter a valid email address.": "Ingresa una dirección de correo válida.",
+            "Enter a valid date.": "Ingresa una fecha válida.",
+            "Ensure this value has at most": "Asegúrate de que este valor tenga como máximo",
+            "Ensure this value has at least": "Asegúrate de que este valor tenga al menos",
+            "characters": "caracteres",
+            "Invalid phone number": "Número de teléfono inválido",
+            "Invalid format": "Formato inválido",
+            "Must be a valid number": "Debe ser un número válido",
+            "Must be unique": "Debe ser único",
+            "Something went wrong": "Algo salió mal",
+            "Server error": "Error del servidor",
+            "Validation error": "Error de validación",
+            "File is required": "El archivo es obligatorio",
+            "Invalid file type": "Tipo de archivo inválido",
+            "File too large": "Archivo demasiado grande",
+        };
+
+        let mensajeTraducido = mensaje;
+        Object.keys(traducciones).forEach(key => {
+            if (mensajeTraducido.includes(key)) {
+                mensajeTraducido = mensajeTraducido.replace(key, traducciones[key]);
+            }
+        });
+
+        return mensajeTraducido;
+    };
+
     // --- EFECTOS ---
     useEffect(() => {
         cargarLibros();
@@ -136,9 +171,21 @@ function TesoreroView() {
             a.remove();
             window.URL.revokeObjectURL(url);
 
+            Swal.fire({
+                icon: "success",
+                title: "Exportación exitosa",
+                text: "Las donaciones se han exportado correctamente.",
+                confirmButtonText: "Aceptar"
+            });
+
         } catch (error) {
             console.error(error);
-            alert(error.message || "Fallo exportación.");
+            Swal.fire({
+                icon: "error",
+                title: "Error",
+                text: error.message || "Fallo en la exportación.",
+                confirmButtonText: "Entendido"
+            });
         } finally {
             setExportando(false);
         }
@@ -295,28 +342,91 @@ function TesoreroView() {
         try {
             if (editandoId) {
                 await updateLibroCuenta(editandoId, form);
-                alert("Actualizado correctamente");
+                Swal.fire({
+                    title: "¡Actualizado!",
+                    text: "El documento se ha actualizado correctamente.",
+                    icon: "success",
+                    confirmButtonText: "Aceptar"
+                });
             } else {
                 await createLibroCuenta(form);
-                alert("Subido correctamente");
+                Swal.fire({
+                    title: "¡Subido!",
+                    text: "El documento se ha subido correctamente.",
+                    icon: "success",
+                    confirmButtonText: "Aceptar"
+                });
             }
             cancelarForm();
             cargarLibros();
         } catch (error) {
             console.error(error);
-            alert(`Error: ${error.message}`);
+            
+            if (error.response && error.response.data) {
+                const errorData = error.response.data;
+                let errorMessages = [];
+                
+                for (const [field, messages] of Object.entries(errorData)) {
+                    if (Array.isArray(messages)) {
+                        messages.forEach(msg => {
+                            errorMessages.push(traducirError(msg));
+                        });
+                    } else {
+                        errorMessages.push(traducirError(messages));
+                    }
+                }
+                
+                Swal.fire({
+                    icon: "error",
+                    title: "Error",
+                    html: `
+                        <div style="text-align: left; max-height: 200px; overflow-y: auto; padding: 10px;">
+                            ${errorMessages.map(msg => `<p>• ${msg}</p>`).join('')}
+                        </div>
+                    `,
+                    confirmButtonText: "Entendido"
+                });
+            } else {
+                Swal.fire({
+                    icon: "error",
+                    title: "Error",
+                    text: traducirError(error.message) || "Ocurrió un error al procesar la solicitud.",
+                    confirmButtonText: "Entendido"
+                });
+            }
         }
     };
 
     const handleEliminar = async (id, titulo) => {
-        if (window.confirm(`¿Eliminar "${titulo}"?`)) {
+        const result = await Swal.fire({
+            title: "¿Estás seguro?",
+            text: `¿Eliminar "${titulo}"? Esta acción no se puede deshacer.`,
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#d33",
+            cancelButtonColor: "#3085d6",
+            confirmButtonText: "Sí, eliminar",
+            cancelButtonText: "Cancelar"
+        });
+
+        if (result.isConfirmed) {
             try {
                 await deleteLibroCuenta(id);
-                alert("Eliminado correctamente");
+                Swal.fire({
+                    title: "¡Eliminado!",
+                    text: "El documento se ha eliminado correctamente.",
+                    icon: "success",
+                    confirmButtonText: "Aceptar"
+                });
                 cargarLibros();
             } catch (error) {
                 console.error(error);
-                alert("Error al eliminar");
+                Swal.fire({
+                    icon: "error",
+                    title: "Error",
+                    text: "Error al eliminar el documento.",
+                    confirmButtonText: "Entendido"
+                });
             }
         }
     };

@@ -6,6 +6,7 @@ import Calendario from '../components/Calendario/Calendario';
 import MensajesPanel from '../components/MensajesPanel/MensajesPanel';
 import Fondo from "../assets/fondo.png";
 import Logo from "../assets/Logo.png";
+import Swal from 'sweetalert2';
 
 // Componente Menú Lateral (Extraído para limpieza)
 const SocioSideMenu = ({ activeSection, setActiveSection, onOpenChangePassword, isOpen, closeMenu }) => {
@@ -25,13 +26,6 @@ const SocioSideMenu = ({ activeSection, setActiveSection, onOpenChangePassword, 
         `}>
             <h3 className="text-base font-bold mb-4 text-gray-700 uppercase tracking-wider">Menú Socio</h3>
             <div className="flex flex-col gap-2">
-                <button 
-                    onClick={() => { setActiveSection('anuncios'); closeMenu(); }}
-                    className={btnClass('anuncios')}
-                >
-                    <span className="text-lg">📢</span> Anuncios
-                </button>
-                
                 <button 
                     onClick={() => { setActiveSection('calendario'); closeMenu(); }}
                     className={btnClass('calendario')}
@@ -56,10 +50,9 @@ function SocioView() {
     const { user, logoutUser } = useAuth();
     
     // Estados principales
-    const [anuncios, setAnuncios] = useState([]);
     const [eventos, setEventos] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [seccionActiva, setSeccionActiva] = useState('anuncios');
+    const [seccionActiva, setSeccionActiva] = useState('calendario');
     
     // Estado para el menú móvil (Responsive)
     const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
@@ -70,8 +63,6 @@ function SocioView() {
     const [nuevaPassword, setNuevaPassword] = useState('');
     const [confirmarPassword, setConfirmarPassword] = useState('');
     const [cambiandoPassword, setCambiandoPassword] = useState(false);
-    const [mensajePassword, setMensajePassword] = useState('');
-    const [tipoMensaje, setTipoMensaje] = useState('');
 
     useEffect(() => {
         cargarDatos();
@@ -82,8 +73,14 @@ function SocioView() {
             const authTokensString = localStorage.getItem('authTokens');
             
             if (!authTokensString) {
-                alert('No estás autenticado. Por favor, inicia sesión.');
-                window.location.href = '/login';
+                Swal.fire({
+                    icon: "error",
+                    title: "Sesión expirada",
+                    text: "Por favor, inicia sesión nuevamente.",
+                    confirmButtonText: "OK"
+                }).then(() => {
+                    window.location.href = '/login';
+                });
                 return;
             }
             
@@ -96,20 +93,21 @@ function SocioView() {
                 }
             };
 
-            const [anunciosRes, eventosRes] = await Promise.all([
-                axios.get('http://127.0.0.1:8000/api/anuncios/', config),
-                axios.get('http://127.0.0.1:8000/api/eventos-calendario/', config)
-            ]);
-            
-            setAnuncios(anunciosRes.data);
+            const eventosRes = await axios.get('http://127.0.0.1:8000/api/eventos-calendario/', config);
             setEventos(eventosRes.data);
             
         } catch (error) {
             console.error("Error cargando datos:", error);
             
             if (error.response?.status === 401) {
-                alert('Sesión expirada. Por favor, inicia sesión nuevamente.');
-                logoutUser();
+                Swal.fire({
+                    icon: "error",
+                    title: "Sesión expirada",
+                    text: "Por favor, inicia sesión nuevamente.",
+                    confirmButtonText: "OK"
+                }).then(() => {
+                    logoutUser();
+                });
             }
         } finally {
             setLoading(false);
@@ -121,26 +119,37 @@ function SocioView() {
         
         // Validaciones
         if (!passwordActual || !nuevaPassword || !confirmarPassword) {
-            setMensajePassword('Todos los campos son obligatorios');
-            setTipoMensaje('error');
+            Swal.fire({
+                icon: "warning",
+                title: "Campos requeridos",
+                text: "Todos los campos son obligatorios",
+                confirmButtonText: "OK"
+            });
             return;
         }
         
         if (nuevaPassword !== confirmarPassword) {
-            setMensajePassword('Las contraseñas nuevas no coinciden');
-            setTipoMensaje('error');
+            Swal.fire({
+                icon: "error",
+                title: "Error",
+                text: "Las contraseñas nuevas no coinciden",
+                confirmButtonText: "OK"
+            });
             return;
         }
         
         if (nuevaPassword.length < 6) {
-            setMensajePassword('La nueva contraseña debe tener al menos 6 caracteres');
-            setTipoMensaje('error');
+            Swal.fire({
+                icon: "warning",
+                title: "Contraseña muy corta",
+                text: "La nueva contraseña debe tener al menos 6 caracteres",
+                confirmButtonText: "OK"
+            });
             return;
         }
         
         try {
             setCambiandoPassword(true);
-            setMensajePassword('');
             
             const authTokensString = localStorage.getItem('authTokens');
             const authTokens = JSON.parse(authTokensString);
@@ -156,19 +165,23 @@ function SocioView() {
             await cambiarPassword(datos, token);
             
             // Si fue exitoso
-            setMensajePassword('✅ Contraseña cambiada correctamente');
-            setTipoMensaje('success');
+            Swal.fire({
+                icon: "success",
+                title: "¡Contraseña cambiada!",
+                text: "Tu contraseña se ha actualizado correctamente",
+                showConfirmButton: false,
+                timer: 2000
+            });
             
             // Limpiar formulario
             setPasswordActual('');
             setNuevaPassword('');
             setConfirmarPassword('');
             
-            // Ocultar formulario después de 3 segundos
+            // Ocultar formulario después del éxito
             setTimeout(() => {
                 setMostrarCambioPassword(false);
-                setMensajePassword('');
-            }, 3000);
+            }, 2000);
             
         } catch (error) {
             console.error('Error cambiando contraseña:', error);
@@ -182,21 +195,16 @@ function SocioView() {
                 mensajeError = 'Contraseña actual incorrecta';
             }
             
-            setMensajePassword(`❌ ${mensajeError}`);
-            setTipoMensaje('error');
+            Swal.fire({
+                icon: "error",
+                title: "Error",
+                text: mensajeError,
+                confirmButtonText: "OK"
+            });
             
         } finally {
             setCambiandoPassword(false);
         }
-    };
-
-    const formatearFecha = (fechaString) => {
-        const fecha = new Date(fechaString);
-        return fecha.toLocaleDateString('es-ES', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
     };
 
     if (loading) {
@@ -260,62 +268,12 @@ function SocioView() {
                 {/* 2. CONTENIDO CENTRAL */}
                 <div className="flex-1 w-full min-w-0 flex flex-col lg:flex-row gap-6">
                     
-                    {/* Área Dinámica (Anuncios/Calendario) */}
+                    {/* Área Dinámica (Calendario) */}
                     <div className="flex-1 min-w-0">
-                        {seccionActiva === 'anuncios' && (
-                            <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
-                                <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-3">
-                                    <h2 className="text-2xl font-bold text-gray-800">📢 Anuncios</h2>
-                                    <span className="bg-blue-100 text-blue-800 text-sm font-bold px-3 py-1 rounded-full">
-                                        {anuncios.length} nuevos
-                                    </span>
-                                </div>
-                                
-                                {anuncios.length === 0 ? (
-                                    <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
-                                        <p className="text-gray-500 text-lg">No hay anuncios disponibles.</p>
-                                        <p className="text-gray-400 text-sm mt-1">Los administradores publicarán novedades pronto.</p>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-6">
-                                        {anuncios.map(anuncio => (
-                                            <div key={anuncio.id} className="border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition duration-300 bg-white flex flex-col md:flex-row">
-                                                {anuncio.imagen && (
-                                                    <div className="md:w-48 h-48 md:h-auto flex-shrink-0 bg-gray-100">
-                                                        <img 
-                                                            src={anuncio.imagen} 
-                                                            alt={anuncio.titulo}
-                                                            className="w-full h-full object-cover"
-                                                            onError={(e) => e.target.style.display = 'none'}
-                                                        />
-                                                    </div>
-                                                )}
-                                                <div className="p-5 flex-1 flex flex-col justify-between">
-                                                    <div>
-                                                        <h3 className="text-xl font-bold text-gray-900 mb-2 leading-tight">{anuncio.titulo}</h3>
-                                                        <p className="text-gray-600 mb-4 text-sm leading-relaxed line-clamp-3">{anuncio.descripcion}</p>
-                                                    </div>
-                                                    <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                                                        📅 Publicado el {formatearFecha(anuncio.creado_en)}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
                         {seccionActiva === 'calendario' && (
                             <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
                                 <h2 className="text-2xl font-bold mb-4 text-gray-800">📅 Calendario de Eventos</h2>
-                                <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200 flex items-start gap-3">
-                                    <span className="text-2xl">ℹ️</span>
-                                    <div>
-                                        <p className="text-blue-900 font-semibold text-sm">Información</p>
-                                        <p className="text-blue-800 text-sm">Aquí puedes ver las próximas actividades. Solo lectura.</p>
-                                    </div>
-                                </div>
+                                {/* ELIMINADO EL MENSAJE INFORMATIVO */}
                                 <Calendario eventos={eventos} modo="socio" />
                             </div>
                         )}
@@ -344,7 +302,9 @@ function SocioView() {
                             <button 
                                 onClick={() => { 
                                     setMostrarCambioPassword(false); 
-                                    setMensajePassword(''); 
+                                    setPasswordActual('');
+                                    setNuevaPassword('');
+                                    setConfirmarPassword('');
                                 }} 
                                 className="text-gray-400 hover:text-gray-600 text-2xl transition"
                             >
@@ -353,13 +313,6 @@ function SocioView() {
                         </div>
                         
                         <form onSubmit={handleCambiarPassword} className="p-6 space-y-5">
-                            {mensajePassword && (
-                                <div className={`p-3 rounded-lg text-sm font-medium flex items-center gap-2 ${tipoMensaje === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                    <span>{tipoMensaje === 'success' ? '✅' : '⚠️'}</span>
-                                    {mensajePassword}
-                                </div>
-                            )}
-                            
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">Contraseña Actual</label>
                                 <input 
@@ -402,7 +355,12 @@ function SocioView() {
                             <div className="flex justify-end gap-3 pt-2">
                                 <button 
                                     type="button" 
-                                    onClick={() => setMostrarCambioPassword(false)} 
+                                    onClick={() => {
+                                        setMostrarCambioPassword(false);
+                                        setPasswordActual('');
+                                        setNuevaPassword('');
+                                        setConfirmarPassword('');
+                                    }} 
                                     className="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition" 
                                     disabled={cambiandoPassword}
                                 >

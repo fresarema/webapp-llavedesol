@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { mensajesService } from "../../services/mensajesService";
+import Swal from 'sweetalert2';
 
 /**
  * MensajesPanel
@@ -75,6 +76,40 @@ const MensajesPanel = ({ userType }) => {
     listaRef.current.scrollTop = listaRef.current.scrollHeight;
   }, [mensajes]);
 
+  // Función para traducir errores (similar a la que usaste antes)
+  const traducirError = (mensaje) => {
+    if (!mensaje) return mensaje;
+    
+    const traducciones = {
+      "already exists": "ya existe en el sistema",
+      "This field is required.": "Este campo es obligatorio.",
+      "Enter a valid email address.": "Ingresa una dirección de correo válida.",
+      "Enter a valid date.": "Ingresa una fecha válida.",
+      "Ensure this value has at most": "Asegúrate de que este valor tenga como máximo",
+      "Ensure this value has at least": "Asegúrate de que este valor tenga al menos",
+      "characters": "caracteres",
+      "Invalid phone number": "Número de teléfono inválido",
+      "Invalid format": "Formato inválido",
+      "Must be a valid number": "Debe ser un número válido",
+      "Must be unique": "Debe ser único",
+      "Something went wrong": "Algo salió mal",
+      "Server error": "Error del servidor",
+      "Validation error": "Error de validación",
+      "Forbidden": "No tienes permiso para realizar esta acción",
+      "Unauthorized": "No estás autorizado. Inicia sesión nuevamente.",
+      "Network Error": "Error de red. Verifica tu conexión.",
+    };
+
+    let mensajeTraducido = mensaje;
+    Object.keys(traducciones).forEach(key => {
+      if (mensajeTraducido.includes(key)) {
+        mensajeTraducido = mensajeTraducido.replace(key, traducciones[key]);
+      }
+    });
+
+    return mensajeTraducido;
+  };
+
   // enviar mensaje (optimista)
   const enviarMensaje = async (e) => {
     e.preventDefault();
@@ -86,6 +121,13 @@ const MensajesPanel = ({ userType }) => {
 
       if (resp && resp.data) {
         setMensajes(prev => [...prev, resp.data]);
+        Swal.fire({
+          icon: "success",
+          title: "¡Mensaje enviado!",
+          text: "Tu mensaje se ha enviado correctamente.",
+          showConfirmButton: false,
+          timer: 1500
+        });
       } else {
         const temp = {
           id: `temp-${Date.now()}`,
@@ -96,6 +138,13 @@ const MensajesPanel = ({ userType }) => {
           leido: false
         };
         setMensajes(prev => [...prev, temp]);
+        Swal.fire({
+          icon: "success",
+          title: "¡Mensaje enviado!",
+          text: "Tu mensaje se ha enviado correctamente.",
+          showConfirmButton: false,
+          timer: 1500
+        });
       }
 
       setNuevoMensaje({
@@ -106,7 +155,36 @@ const MensajesPanel = ({ userType }) => {
       setMostrarForm(false);
     } catch (error) {
       console.error('❌ Error enviando mensaje:', error);
-      alert('Error enviando mensaje. Revisa la consola.');
+      
+      let errorMessage = "Error enviando mensaje. Por favor, inténtalo de nuevo.";
+      
+      if (error.response && error.response.data) {
+        const errorData = error.response.data;
+        let errorMessages = [];
+        
+        for (const [field, messages] of Object.entries(errorData)) {
+          if (Array.isArray(messages)) {
+            messages.forEach(msg => {
+              errorMessages.push(traducirError(msg));
+            });
+          } else {
+            errorMessages.push(traducirError(messages));
+          }
+        }
+        
+        if (errorMessages.length > 0) {
+          errorMessage = errorMessages.join(' ');
+        }
+      } else if (error.message) {
+        errorMessage = traducirError(error.message);
+      }
+      
+      Swal.fire({
+        icon: "error",
+        title: "Error al enviar",
+        text: errorMessage,
+        confirmButtonText: "Entendido"
+      });
     }
   };
 
@@ -115,9 +193,19 @@ const MensajesPanel = ({ userType }) => {
    * - ADMIN: elimina en backend (definitivo).
    * - TESORERO / SOCIO: oculta localmente (no backend).
    */
-  const borrarMensaje = async (id) => {
-    const confirmacion = window.confirm('¿Seguro que quieres eliminar este mensaje?');
-    if (!confirmacion) return;
+  const borrarMensaje = async (id, asunto = 'este mensaje') => {
+    const result = await Swal.fire({
+        title: "¿Estás seguro?",
+        text: `¿Eliminar "${asunto}"?`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Sí, eliminar",
+        cancelButtonText: "Cancelar"
+    });
+
+    if (!result.isConfirmed) return;
 
     if (userType === 'TESORERO' || userType === 'SOCIO') {
       // ocultar local sin tocar backend
@@ -126,8 +214,22 @@ const MensajesPanel = ({ userType }) => {
         const hidden = loadHiddenIds();
         hidden.add(id);
         saveHiddenIds(hidden);
+        
+        Swal.fire({
+          icon: "success",
+          title: "Mensaje ocultado",
+          text: "El mensaje se ha ocultado de tu vista.",
+          showConfirmButton: false,
+          timer: 1500
+        });
       } catch (e) {
         console.error('Error ocultando mensaje localmente:', e);
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: "No se pudo ocultar el mensaje.",
+          confirmButtonText: "Entendido"
+        });
       }
       return;
     }
@@ -136,8 +238,34 @@ const MensajesPanel = ({ userType }) => {
     try {
       setMensajes(prev => prev.filter(m => m.id !== id));
       await mensajesService.deleteMensaje(id);
+      
+      Swal.fire({
+        icon: "success",
+        title: "¡Eliminado!",
+        text: "El mensaje se ha eliminado permanentemente.",
+        showConfirmButton: false,
+        timer: 1500
+      });
     } catch (error) {
       console.error('❌ Error eliminando mensaje (backend):', error);
+      
+      let errorMessage = "Error al eliminar el mensaje. Por favor, inténtalo de nuevo.";
+      if (error.response) {
+        if (error.response.status === 404) {
+          errorMessage = "El mensaje no fue encontrado. Puede que ya haya sido eliminado.";
+        } else if (error.response.status === 403) {
+          errorMessage = "No tienes permisos para eliminar este mensaje.";
+        }
+      }
+      
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: errorMessage,
+        confirmButtonText: "Entendido"
+      });
+      
+      // Recargar mensajes para mostrar el estado actual
       await cargarMensajes();
     }
   };
@@ -243,7 +371,7 @@ const MensajesPanel = ({ userType }) => {
                   <p style={{ margin: 0, color: '#555', fontSize: '11px', lineHeight: '1.3' }}>{texto.length > 80 ? `${texto.substring(0, 80)}...` : texto}</p>
 
                   {puedeEliminar && (
-                    <button onClick={() => borrarMensaje(mensaje.id)} title="Eliminar mensaje" aria-label={`Eliminar mensaje ${mensaje.asunto || ''}`} style={deleteBtnBase} onMouseEnter={(e) => Object.assign(e.currentTarget.style, deleteBtnHover)} onMouseLeave={(e) => Object.assign(e.currentTarget.style, deleteBtnBase)}>✕</button>
+                    <button onClick={() => borrarMensaje(mensaje.id, mensaje.asunto)} title="Eliminar mensaje" aria-label={`Eliminar mensaje ${mensaje.asunto || ''}`} style={deleteBtnBase} onMouseEnter={(e) => Object.assign(e.currentTarget.style, deleteBtnHover)} onMouseLeave={(e) => Object.assign(e.currentTarget.style, deleteBtnBase)}>✕</button>
                   )}
                 </div>
               );

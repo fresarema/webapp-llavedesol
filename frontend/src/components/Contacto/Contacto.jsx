@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import Swal from 'sweetalert2';
 
 // Iconos SVG simples para no depender de librerías externas
 const Icons = {
@@ -33,7 +34,7 @@ function Contacto() {
     message: ''
   });
 
-  const [status, setStatus] = useState('');
+  const [loading, setLoading] = useState(false);
   const MAX_CHARS = 500;
 
   const handleChange = (e) => {
@@ -49,18 +50,40 @@ function Contacto() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setStatus('');
-
+    
+    // Validaciones
     if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
-        setStatus('Error: Todos los campos son obligatorios.');
+        Swal.fire({
+            icon: "warning",
+            title: "Campos incompletos",
+            text: "Todos los campos son obligatorios.",
+            confirmButtonText: "OK"
+        });
         return;
     }
+    
     if (!validateEmail(formData.email)) {
-        setStatus('Error: Por favor ingresa un correo electrónico válido.');
+        Swal.fire({
+            icon: "error",
+            title: "Correo inválido",
+            text: "Por favor ingresa un correo electrónico válido.",
+            confirmButtonText: "OK"
+        });
         return;
     }
 
-    setStatus('Enviando...');
+    if (formData.message.length > MAX_CHARS) {
+        Swal.fire({
+            icon: "warning",
+            title: "Mensaje demasiado largo",
+            text: `El mensaje no debe exceder ${MAX_CHARS} caracteres.`,
+            confirmButtonText: "OK"
+        });
+        return;
+    }
+
+    setLoading(true);
+
     const dataToSend = {
       nombre: formData.name,
       correo: formData.email,
@@ -69,13 +92,43 @@ function Contacto() {
 
     try {
       await axios.post('http://127.0.0.1:8000/api/contacto/', dataToSend);
-      setStatus('¡Mensaje enviado con éxito!');
+      
+      Swal.fire({
+        icon: "success",
+        title: "¡Mensaje enviado!",
+        text: "Hemos recibido tu mensaje correctamente. Te contactaremos pronto.",
+        confirmButtonText: "Aceptar",
+        timer: 3000
+      });
+      
+      // Limpiar formulario
       setFormData({ name: '', email: '', message: '' });
-      // Borrar mensaje de éxito después de 5 segundos
-      setTimeout(() => setStatus(''), 5000);
+      
     } catch (error) {
       console.error(error);
-      setStatus('Hubo un error al enviar el mensaje.');
+      
+      let errorMessage = "Hubo un error al enviar el mensaje. Por favor, inténtalo de nuevo.";
+      
+      if (error.response) {
+        if (error.response.status === 400) {
+          errorMessage = "Datos inválidos. Por favor verifica la información.";
+        } else if (error.response.status === 500) {
+          errorMessage = "Error del servidor. Por favor intenta más tarde.";
+        } else if (error.response.data) {
+          errorMessage = error.response.data.detail || errorMessage;
+        }
+      } else if (error.request) {
+        errorMessage = "Error de conexión. Verifica tu internet e inténtalo de nuevo.";
+      }
+      
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: errorMessage,
+        confirmButtonText: "OK"
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -176,16 +229,11 @@ function Contacto() {
 
                     <button 
                         type="submit" 
-                        className="w-full bg-orange-600 text-white font-bold py-4 rounded-lg hover:bg-orange-700 transform hover:-translate-y-1 transition-all duration-300 shadow-lg shadow-orange-500/30"
+                        disabled={loading}
+                        className="w-full bg-orange-600 text-white font-bold py-4 rounded-lg hover:bg-orange-700 transform hover:-translate-y-1 transition-all duration-300 shadow-lg shadow-orange-500/30 disabled:opacity-70 disabled:cursor-not-allowed"
                     >
-                        Enviar Mensaje
+                        {loading ? 'Enviando...' : 'Enviar Mensaje'}
                     </button>
-
-                    {status && (
-                        <div className={`p-4 rounded-lg text-center font-medium ${status.includes('Error') || status.includes('error') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                            {status}
-                        </div>
-                    )}
                 </form>
             </div>
           </div>
