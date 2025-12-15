@@ -21,7 +21,7 @@ import Pagination from '../components/Pagination/Pagination';
 function SideMenu({ activeSection, setActiveSection, isOpen, closeMenu }) {
      const menuItems = [
       { name: 'Documentos Tesorería', path: 'documentos', icon: '📚' },
-      { name: 'Gestión Donaciones', path: 'donaciones', icon: '💰' },
+      { name: 'Historial de Donaciones', path: 'donaciones', icon: '💰' },
       { name: 'Calendario', path: 'calendario', icon: '🗓️' },
    ];
    
@@ -506,7 +506,7 @@ function TesoreroView() {
             <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                 <h2 className="text-xl md:text-2xl font-bold">📚 Documentos Tesorería</h2>
                 <button onClick={() => { setMostrarForm(true); setEditandoId(null); }} className="w-full md:w-auto bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-lg font-medium transition">
-                    + Subir Nuevo Libro
+                    + Subir Nuevo Documento
                 </button>
             </div>
 
@@ -543,25 +543,28 @@ function TesoreroView() {
             </div>
 
             {loading ? <div className="text-center py-8">Cargando...</div> : librosFiltrados.length === 0 ? <div className="text-center py-8 text-gray-500">No se encontraron documentos.</div> : (
-                <div className="space-y-4">
-                    {librosFiltrados.map((libro) => (
-                        <div key={libro.id} className="border p-4 rounded-lg bg-gray-50 flex flex-col md:flex-row justify-between gap-4">
-                            <div className="flex-1">
-                                <h3 className="text-lg font-bold text-gray-800">{libro.titulo}</h3>
-                                <p className="text-gray-600 text-sm mt-1">{libro.descripcion}</p>
-                                <div className="mt-2 text-xs text-gray-500">
-                                    <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded mr-2">{libro.tipo}</span>
-                                    <span>{formatearFecha(libro.fecha_periodo)}</span>
-                                </div>
-                            </div>
-                            <div className="flex gap-2 w-full md:w-auto">
-                                <a href={getDownloadUrl(libro.archivo)} download className="flex-1 md:flex-none text-center bg-blue-500 hover:bg-blue-600 text-white py-2 px-3 rounded text-sm">Descargar</a>
-                                <button onClick={() => iniciarEdicion(libro)} className="flex-1 md:flex-none bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-3 rounded text-sm">Editar</button>
-                                <button onClick={() => handleEliminar(libro.id, libro.titulo)} className="flex-1 md:flex-none bg-red-500 hover:bg-red-600 text-white py-2 px-3 rounded text-sm">Eliminar</button>
+            <div className="space-y-4">
+                {librosFiltrados.map((libro) => (
+                    <div key={libro.id} className="border p-4 rounded-lg bg-gray-50 flex flex-col md:flex-row justify-between gap-4">
+                        <div className="flex-1">
+                            <h3 className="text-lg font-bold text-gray-800">{libro.titulo}</h3>
+                            <p className="text-gray-600 text-sm mt-1">{libro.descripcion}</p>
+                            <div className="mt-2 text-xs text-gray-500">
+                                <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded mr-2">{libro.tipo}</span>
+                                <span>{formatearFecha(libro.fecha_periodo)}</span>
                             </div>
                         </div>
-                    ))}
-                </div>
+                        <div className="flex gap-2 w-full md:w-auto">
+                            {}
+                            <a href={getDownloadUrl(libro.archivo)} download className="flex-1 md:flex-none flex items-center justify-center bg-blue-500 hover:bg-blue-600 text-white py-2 px-3 rounded text-sm">Descargar</a>
+                            {}
+                            <button onClick={() => iniciarEdicion(libro)} className="flex-1 md:flex-none bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-3 rounded text-sm">Editar</button>
+                            {}
+                            <button onClick={() => handleEliminar(libro.id, libro.titulo)} className="flex-1 md:flex-none bg-red-500 hover:bg-red-600 text-white py-2 px-3 rounded text-sm">Eliminar</button>
+                        </div>
+                    </div>
+                ))}
+            </div>
             )}
         </div>
     );
